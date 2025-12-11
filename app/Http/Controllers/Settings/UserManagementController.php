@@ -154,4 +154,43 @@ class UserManagementController extends Controller
 
         return back();
     }
+
+    /**
+     * Update a role's name (and slug).
+     */
+    public function updateRole(Request $request, Role $role): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        if ($role->slug === 'admin') {
+            return back();
+        }
+
+        $role->update([
+            'name' => $data['name'],
+            'slug' => Str::slug($data['name']),
+        ]);
+
+        return back();
+    }
+
+    /**
+     * Delete a role.
+     */
+    public function destroyRole(Role $role): RedirectResponse
+    {
+        if ($role->slug === 'admin') {
+            return back();
+        }
+
+        DB::transaction(function () use ($role): void {
+            $role->permissions()->detach();
+            $role->users()->detach();
+            $role->delete();
+        });
+
+        return back();
+    }
 }

@@ -33,6 +33,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('users/{user}/roles', [UserManagementController::class, 'updateUserRoles'])->name('users.roles');
         Route::delete('users/{user}', [UserManagementController::class, 'destroyUser'])->name('users.destroy');
         Route::patch('roles/{role}/permissions', [UserManagementController::class, 'updateRolePermissions'])->name('roles.permissions');
+        Route::patch('roles/{role}', [UserManagementController::class, 'updateRole'])->name('roles.update');
+        Route::delete('roles/{role}', [UserManagementController::class, 'destroyRole'])->name('roles.destroy');
     });
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])

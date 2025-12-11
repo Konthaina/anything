@@ -153,7 +153,7 @@ export default function AdminSettings() {
                             <div className="space-y-3">
                                 {roles.map((role) => (
                                     <RolePermissionsForm
-                                        key={`${role.id}-${(role.permissions ?? [])
+                                        key={`${role.id}-${role.name}-${(role.permissions ?? [])
                                             .map((perm) => perm.id)
                                             .join('-')}`}
                                         role={role}
@@ -363,19 +363,55 @@ function RolePermissionsForm({
     permissions: Permission[];
 }) {
     const [selected, setSelected] = useState<number[]>(() => role.permissions?.map((perm) => perm.id) ?? []);
+    const [roleName, setRoleName] = useState(() => role.name);
 
     const action = `/settings/admin/roles/${role.id}/permissions`;
 
     return (
-        <Form method="post" action={action} data={{ permissions: selected }}>
-            {({ setData, processing, errors }) => (
-                <div className="rounded-md border border-border bg-background p-3 sm:p-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold text-foreground">{role.name}</p>
-                            <p className="text-xs text-muted-foreground">{role.slug}</p>
+        <div className="rounded-md border border-border bg-background p-3 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Form method="post" action={`/settings/admin/roles/${role.id}`} data={{ name: roleName }}>
+                    {({ setData, processing, errors }) => (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="_method" value="PATCH" />
+                            <Input
+                                name="name"
+                                value={roleName}
+                                onChange={(e) => {
+                                    setRoleName(e.target.value);
+                                    setData('name', e.target.value);
+                                }}
+                                className="w-40 sm:w-56"
+                            />
+                            <Button size="sm" type="submit" disabled={processing || role.slug === 'admin'}>
+                                Rename
+                            </Button>
+                            <InputError message={errors.name} />
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                    )}
+                </Form>
+
+                <Form method="post" action={`/settings/admin/roles/${role.id}`}>
+                    {({ processing }) => (
+                        <>
+                            <input type="hidden" name="_method" value="DELETE" />
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                type="submit"
+                                disabled={processing || role.slug === 'admin'}
+                            >
+                                Delete role
+                            </Button>
+                        </>
+                    )}
+                </Form>
+            </div>
+
+            <Form method="post" action={action} data={{ permissions: selected }}>
+                {({ setData, processing, errors }) => (
+                    <>
+                        <div className="mt-3 flex flex-wrap gap-2">
                             {selected.length === 0 ? (
                                 <Badge variant="secondary">No permissions</Badge>
                             ) : (
@@ -390,46 +426,46 @@ function RolePermissionsForm({
                                 })
                             )}
                         </div>
-                    </div>
 
-                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {permissions.map((perm) => {
-                            const checked = selected.includes(perm.id);
-                            return (
-                                <label
-                                    key={perm.id}
-                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
-                                >
-                                    <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={(value) => {
-                                            const isChecked = Boolean(value);
-                                            const next = isChecked
-                                                ? [...selected, perm.id]
-                                                : selected.filter((id) => id !== perm.id);
-                                            setSelected(next);
-                                            setData('permissions', next);
-                                        }}
-                                    />
-                                    {perm.name}
-                                </label>
-                            );
-                        })}
-                    </div>
+                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {permissions.map((perm) => {
+                                const checked = selected.includes(perm.id);
+                                return (
+                                    <label
+                                        key={perm.id}
+                                        className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+                                    >
+                                        <Checkbox
+                                            checked={checked}
+                                            onCheckedChange={(value) => {
+                                                const isChecked = Boolean(value);
+                                                const next = isChecked
+                                                    ? [...selected, perm.id]
+                                                    : selected.filter((id) => id !== perm.id);
+                                                setSelected(next);
+                                                setData('permissions', next);
+                                            }}
+                                        />
+                                        {perm.name}
+                                    </label>
+                                );
+                            })}
+                        </div>
 
-                    <div className="mt-3 flex items-center gap-3">
-                        {selected.map((permId) => (
-                            <input key={permId} type="hidden" name="permissions[]" value={permId} />
-                        ))}
-                        <input type="hidden" name="_method" value="PATCH" />
-                        <Button size="sm" disabled={processing}>
-                            Save permissions
-                        </Button>
-                        <InputError message={errors.permissions} />
-                    </div>
-                </div>
-            )}
-        </Form>
+                        <div className="mt-3 flex items-center gap-3">
+                            {selected.map((permId) => (
+                                <input key={permId} type="hidden" name="permissions[]" value={permId} />
+                            ))}
+                            <input type="hidden" name="_method" value="PATCH" />
+                            <Button size="sm" disabled={processing}>
+                                Save permissions
+                            </Button>
+                            <InputError message={errors.permissions} />
+                        </div>
+                    </>
+                )}
+            </Form>
+        </div>
     );
 }
 
