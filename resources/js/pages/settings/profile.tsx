@@ -33,7 +33,6 @@ export default function Profile({
 }) {
     const { auth } = usePage<SharedData>().props;
     const [preview, setPreview] = useState<string | null>(null);
-    const [fileName, setFileName] = useState<string | null>(null);
     const getInitials = useInitials();
 
     useEffect(() => {
@@ -55,7 +54,6 @@ export default function Profile({
             return file ? URL.createObjectURL(file) : null;
         });
 
-        setFileName(file?.name ?? null);
     };
 
     const resetPreview = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -66,7 +64,6 @@ export default function Profile({
             }
             return null;
         });
-        setFileName(null);
     };
 
     const avatarSrc = useMemo(() => {
@@ -99,7 +96,6 @@ export default function Profile({
                                 }
                                 return null;
                             });
-                            setFileName(null);
                         }}
                         className="space-y-6"
                         encType="multipart/form-data"

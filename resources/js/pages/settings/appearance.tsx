@@ -25,7 +25,6 @@ export default function Appearance() {
     const { app } = usePage<SharedData>().props;
     const siteName = app?.name ?? 'Laravel Starter Kit';
     const [preview, setPreview] = useState<string | null>(null);
-    const [fileName, setFileName] = useState<string | null>(null);
 
     useEffect(() => {
         return () => {
@@ -46,7 +45,6 @@ export default function Appearance() {
             return file ? URL.createObjectURL(file) : null;
         });
 
-        setFileName(file?.name ?? null);
     };
 
     const resetPreview = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -57,7 +55,6 @@ export default function Appearance() {
             }
             return null;
         });
-        setFileName(null);
     };
 
     const logoSrc = useMemo(() => {
@@ -89,7 +86,6 @@ export default function Appearance() {
                                 }
                                 return null;
                             });
-                            setFileName(null);
                         }}
                     >
                         {({ processing, errors }) => (

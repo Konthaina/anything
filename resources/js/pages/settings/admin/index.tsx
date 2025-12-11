@@ -1,5 +1,5 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
@@ -119,7 +119,7 @@ export default function AdminSettings() {
                                     <div className="divide-y divide-border">
                                         {users.data.map((user) => (
                                             <UserRow
-                                                key={user.id}
+                                                key={`${user.id}-${user.updated_at ?? 'na'}`}
                                                 user={user}
                                                 roles={roles}
                                                 isEditing={editingId === user.id}
@@ -152,7 +152,13 @@ export default function AdminSettings() {
 
                             <div className="space-y-3">
                                 {roles.map((role) => (
-                                    <RolePermissionsForm key={role.id} role={role} permissions={permissions} />
+                                    <RolePermissionsForm
+                                        key={`${role.id}-${(role.permissions ?? [])
+                                            .map((perm) => perm.id)
+                                            .join('-')}`}
+                                        role={role}
+                                        permissions={permissions}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -174,17 +180,10 @@ function UserRow({
     isEditing: boolean;
     onToggleEdit: () => void;
 }) {
-    const [selected, setSelected] = useState<number[]>(user.roles.map((role) => role.id));
-    const [name, setName] = useState(user.name);
-    const [email, setEmail] = useState(user.email);
+    const [selected, setSelected] = useState<number[]>(() => user.roles.map((role) => role.id));
+    const [name, setName] = useState(() => user.name);
+    const [email, setEmail] = useState(() => user.email);
     const [password, setPassword] = useState('');
-
-    useEffect(() => {
-        setSelected(user.roles.map((role) => role.id));
-        setName(user.name);
-        setEmail(user.email);
-        setPassword('');
-    }, [user.roles, user.name, user.email]);
 
     const rolesAction = `/settings/admin/users/${user.id}/roles`;
     const updateAction = `/settings/admin/users/${user.id}`;
@@ -363,11 +362,7 @@ function RolePermissionsForm({
     role: Role;
     permissions: Permission[];
 }) {
-    const [selected, setSelected] = useState<number[]>(role.permissions?.map((perm) => perm.id) ?? []);
-
-    useEffect(() => {
-        setSelected(role.permissions?.map((perm) => perm.id) ?? []);
-    }, [role.permissions]);
+    const [selected, setSelected] = useState<number[]>(() => role.permissions?.map((perm) => perm.id) ?? []);
 
     const action = `/settings/admin/roles/${role.id}/permissions`;
 
