@@ -608,13 +608,11 @@ function Pagination({
     if (!links || links.length === 0) return null;
 
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-            {meta && meta.total > 0 ? (
-                <div className="text-muted-foreground">
+        <div className="flex flex-col items-center gap-2 bg-background px-3 py-2 text-sm">
+            {meta && meta.total > 0 && (
+                <div className="text-muted-foreground text-center">
                     Showing {meta.from ?? 0}–{meta.to ?? 0} of {meta.total}
                 </div>
-            ) : (
-                <div className="text-muted-foreground">Pagination</div>
             )}
             {links?.length ? (
                 <div className="flex items-center gap-1">
