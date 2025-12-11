@@ -223,6 +223,7 @@ function UserRow({
     const [name, setName] = useState(() => user.name);
     const [email, setEmail] = useState(() => user.email);
     const [password, setPassword] = useState('');
+    const [showConfirm, setShowConfirm] = useState(false);
 
     const rolesAction = `/settings/admin/users/${user.id}/roles`;
     const updateAction = `/settings/admin/users/${user.id}`;
@@ -330,21 +331,60 @@ function UserRow({
                             )}
                         </Form>
 
-                        <Form method="post" action={deleteAction}>
-                            {({ processing: deleting }) => (
-                                <>
-                                    <input type="hidden" name="_method" value="DELETE" />
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        disabled={deleting}
-                                        type="submit"
-                                    >
-                                        Delete user
-                                    </Button>
-                                </>
-                            )}
-                        </Form>
+                        <div className="relative">
+                            <Form method="post" action={deleteAction}>
+                                {({ processing: deleting, submit }) => (
+                                    <>
+                                        <input type="hidden" name="_method" value="DELETE" />
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            disabled={deleting}
+                                            type="button"
+                                            onClick={() => setShowConfirm(true)}
+                                        >
+                                            Delete user
+                                        </Button>
+
+                                        {showConfirm && (
+                                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+                                                <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg ring-1 ring-border">
+                                                    <h3 className="text-base font-semibold text-foreground">
+                                                        Delete user
+                                                    </h3>
+                                                    <p className="mt-2 text-sm text-muted-foreground">
+                                                        Are you sure you want to delete{' '}
+                                                        <span className="font-semibold text-foreground">{user.name}</span>?
+                                                        This action cannot be undone.
+                                                    </p>
+                                                    <div className="mt-4 flex justify-end gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            onClick={() => setShowConfirm(false)}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            disabled={deleting}
+                                                            onClick={() => {
+                                                                setShowConfirm(false);
+                                                                submit();
+                                                            }}
+                                                        >
+                                                            Confirm delete
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </Form>
+                        </div>
 
                         <Form method="post" action={rolesAction} data={{ roles: selected }}>
                             {({ setData, processing, errors }) => (
@@ -403,6 +443,7 @@ function RolePermissionsForm({
 }) {
     const [selected, setSelected] = useState<number[]>(() => role.permissions?.map((perm) => perm.id) ?? []);
     const [roleName, setRoleName] = useState(() => role.name);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const action = `/settings/admin/roles/${role.id}/permissions`;
 
@@ -430,21 +471,60 @@ function RolePermissionsForm({
                     )}
                 </Form>
 
-                <Form method="post" action={`/settings/admin/roles/${role.id}`}>
-                    {({ processing }) => (
-                        <>
-                            <input type="hidden" name="_method" value="DELETE" />
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                type="submit"
-                                disabled={processing || role.slug === 'admin'}
-                            >
-                                Delete role
-                            </Button>
-                        </>
-                    )}
-                </Form>
+                <div className="relative">
+                    <Form method="post" action={`/settings/admin/roles/${role.id}`}>
+                        {({ processing, submit }) => (
+                            <>
+                                <input type="hidden" name="_method" value="DELETE" />
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    type="button"
+                                    disabled={processing || role.slug === 'admin'}
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                >
+                                    Delete role
+                                </Button>
+
+                                {showDeleteConfirm && (
+                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+                                        <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg ring-1 ring-border">
+                                            <h3 className="text-base font-semibold text-foreground">
+                                                Delete role
+                                            </h3>
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                Are you sure you want to delete{' '}
+                                                <span className="font-semibold text-foreground">{role.name}</span>?
+                                                This will remove the role and detach it from all users.
+                                            </p>
+                                            <div className="mt-4 flex justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() => setShowDeleteConfirm(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    disabled={processing}
+                                                    onClick={() => {
+                                                        setShowDeleteConfirm(false);
+                                                        submit();
+                                                    }}
+                                                >
+                                                    Confirm delete
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </Form>
+                </div>
             </div>
 
             <Form method="post" action={action} data={{ permissions: selected }}>
