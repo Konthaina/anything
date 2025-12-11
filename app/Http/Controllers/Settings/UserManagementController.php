@@ -18,11 +18,19 @@ class UserManagementController extends Controller
     /**
      * Show the user, role, and permission management page.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $search = (string) $request->query('search', '');
+
         return Inertia::render('settings/admin/index', [
             'users' => User::query()
                 ->select('id', 'name', 'email', 'avatar_path', 'updated_at')
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('email', 'like', '%'.$search.'%');
+                    });
+                })
                 ->with('roles:id,name,slug')
                 ->orderBy('name')
                 ->paginate(8)
@@ -34,6 +42,9 @@ class UserManagementController extends Controller
             'permissions' => Permission::query()
                 ->select('id', 'name', 'slug')
                 ->get(),
+            'filters' => [
+                'search' => $search,
+            ],
         ]);
     }
 
@@ -49,25 +60,6 @@ class UserManagementController extends Controller
         $slug = Str::slug($data['name']);
 
         Role::firstOrCreate(
-            ['slug' => $slug],
-            ['name' => $data['name']]
-        );
-
-        return back();
-    }
-
-    /**
-     * Create a new permission.
-     */
-    public function storePermission(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-        ]);
-
-        $slug = Str::slug($data['name']);
-
-        Permission::firstOrCreate(
             ['slug' => $slug],
             ['name' => $data['name']]
         );

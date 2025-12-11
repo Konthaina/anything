@@ -27,7 +27,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can.manage-users')->prefix('settings/admin')->name('admin.')->group(function () {
         Route::get('/', [UserManagementController::class, 'index'])->name('index');
         Route::post('roles', [UserManagementController::class, 'storeRole'])->name('roles.store');
-        Route::post('permissions', [UserManagementController::class, 'storePermission'])->name('permissions.store');
         Route::post('users', [UserManagementController::class, 'storeUser'])->name('users.store');
         Route::patch('users/{user}', [UserManagementController::class, 'updateUser'])->name('users.update');
         Route::patch('users/{user}/roles', [UserManagementController::class, 'updateUserRoles'])->name('users.roles');

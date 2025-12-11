@@ -42,20 +42,30 @@ interface Paginated<T> {
         label: string;
         active: boolean;
     }[];
+    meta?: {
+        current_page: number;
+        last_page: number;
+        from: number | null;
+        to: number | null;
+        total: number;
+        per_page: number;
+    };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'User management', href: '/settings/admin' }];
 
 export default function AdminSettings() {
-    const { users, roles, permissions, canManageRoles } = usePage<
+    const { users, roles, permissions, canManageRoles, filters } = usePage<
         SharedData & {
             users: Paginated<UserWithRoles>;
             roles: Role[];
             permissions: Permission[];
+            filters?: { search?: string };
         }
     >().props;
 
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [search, setSearch] = useState(() => filters?.search ?? '');
     const [activeTab, setActiveTab] = useState<'users' | 'roles'>(
         canManageRoles ? 'users' : 'users',
     );
@@ -105,7 +115,36 @@ export default function AdminSettings() {
 
                     {activeTab === 'users' && (
                         <div className="space-y-4 rounded-lg border border-border bg-background/90 p-4 shadow-sm">
-                            <CreateUserForm />
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <CreateUserForm />
+                                <Form method="get" action="/settings/admin" data={{ search }}>
+                                    {({ setData, processing }) => (
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                name="search"
+                                                value={search}
+                                                onChange={(e) => {
+                                                    setSearch(e.target.value);
+                                                    setData('search', e.target.value);
+                                                }}
+                                                placeholder="Search users..."
+                                                className="w-56"
+                                            />
+                                            <Button size="sm" variant="secondary" type="submit" disabled={processing}>
+                                                Search
+                                            </Button>
+                                            {search && (
+                                                <Link
+                                                    href="/settings/admin"
+                                                    className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                                                >
+                                                    Clear
+                                                </Link>
+                                            )}
+                                        </div>
+                                    )}
+                                </Form>
+                            </div>
 
                             <div className="overflow-x-auto rounded-lg border border-border">
                                 <div className="min-w-[880px]">
@@ -132,7 +171,7 @@ export default function AdminSettings() {
                                 </div>
                             </div>
 
-                            <Pagination links={users.links} />
+                            <Pagination links={users.links} meta={users.meta} />
                         </div>
                     )}
 
@@ -561,39 +600,54 @@ function CreateUserForm() {
 
 function Pagination({
     links,
+    meta,
 }: {
     links: { url: string | null; label: string; active: boolean }[];
+    meta?: { current_page: number; last_page: number; from: number | null; to: number | null; total: number };
 }) {
-    if (!links || links.length <= 3) return null;
+    if (!links || links.length === 0) return null;
 
     return (
-        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
-            {links.map((link, idx) => {
-                const isPrev = idx === 0;
-                const isNext = idx === links.length - 1;
-                const label = isPrev
-                    ? 'Previous'
-                    : isNext
-                      ? 'Next'
-                      : link.label.replace(/&laquo;|&raquo;|;/g, '');
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+            {meta && meta.total > 0 ? (
+                <div className="text-muted-foreground">
+                    Showing {meta.from ?? 0}–{meta.to ?? 0} of {meta.total}
+                </div>
+            ) : (
+                <div className="text-muted-foreground">Pagination</div>
+            )}
+            {links?.length ? (
+                <div className="flex items-center gap-1">
+                    {links.map((link, idx) => {
+                        const isPrev = idx === 0;
+                        const isNext = idx === links.length - 1;
+                        const label = isPrev
+                            ? 'Previous'
+                            : isNext
+                              ? 'Next'
+                              : link.label.replace(/&laquo;|&raquo;|;/g, '');
 
-                return (
-                    <Link
-                        key={`${link.label}-${idx}`}
-                        href={link.url ?? '#'}
-                        className={[
-                            'rounded-md px-3 py-1 transition',
-                            link.active ? 'bg-foreground text-background' : 'text-foreground/80 hover:bg-muted',
-                            !link.url && 'cursor-not-allowed opacity-50',
-                        ]
-                            .filter(Boolean)
-                            .join(' ')}
-                        aria-disabled={!link.url}
-                    >
-                        {label}
-                    </Link>
-                );
-            })}
+                        const disabled = !link.url;
+
+                        return (
+                            <Link
+                                key={`${link.label}-${idx}`}
+                                href={link.url ?? '#'}
+                                className={[
+                                    'rounded-md px-3 py-1 transition',
+                                    link.active ? 'bg-foreground text-background' : 'text-foreground/80 hover:bg-muted',
+                                    disabled && 'cursor-not-allowed opacity-50',
+                                ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                aria-disabled={disabled}
+                            >
+                                {label}
+                            </Link>
+                        );
+                    })}
+                </div>
+            ) : null}
         </div>
     );
 }
