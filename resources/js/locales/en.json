@@ -284,6 +284,8 @@
         "like": "Like",
         "comment": "Comment",
         "share": "Share",
+        "view_image": "View image",
+        "view_image_description": "Open the full-size image in a modal.",
         "edit": "Edit post",
         "delete": "Delete post",
         "edit_title": "Edit post",

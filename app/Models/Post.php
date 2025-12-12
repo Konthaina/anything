@@ -17,14 +17,14 @@ class Post extends Model
     protected $fillable = [
         'user_id',
         'content',
-        'image_path',
+        'image_paths',
         'likes_count',
         'comments_count',
         'shares_count',
     ];
 
     protected $appends = [
-        'image_url',
+        'image_urls',
     ];
 
     protected function casts(): array
@@ -41,18 +41,45 @@ class Post extends Model
         return $this->belongsTo(User::class);
     }
 
-    protected function imageUrl(): Attribute
+    public function getImagePathsAttribute($value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? array_values(array_filter($decoded)) : [];
+    }
+
+    public function setImagePathsAttribute($value): void
+    {
+        $paths = array_values(array_filter((array) $value));
+        $this->attributes['image_paths'] = $paths ? json_encode($paths) : null;
+    }
+
+    protected function imageUrls(): Attribute
     {
         return Attribute::get(function () {
-            if (! $this->image_path) {
-                return null;
-            }
+            $urls = array_map(
+                fn (?string $path) => $this->resolveImageUrl($path),
+                $this->image_paths ?? [],
+            );
 
-            if (Str::startsWith($this->image_path, ['http://', 'https://'])) {
-                return $this->image_path;
-            }
-
-            return Storage::disk('public')->url($this->image_path);
+            return array_values(array_filter($urls));
         });
+    }
+
+    private function resolveImageUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+
+        return Storage::disk('public')->url($path);
     }
 }

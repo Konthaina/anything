@@ -55,7 +55,7 @@ class DatabaseSeeder extends Seeder
             ->for($admin)
             ->create([
                 'content' => 'Just wrapped up an amazing brainstorming session with the team! The energy was incredible and we came up with some truly innovative ideas for the upcoming community guidelines.',
-                'image_path' => 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80',
+                'image_paths' => ['https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80'],
                 'likes_count' => 42,
                 'comments_count' => 12,
                 'shares_count' => 3,

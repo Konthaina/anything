@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -12,6 +13,8 @@ use Inertia\Response;
 
 class FeedController extends Controller
 {
+    private const MAX_IMAGES = 7;
+
     public function index(): Response
     {
         $posts = Post::query()
@@ -22,7 +25,7 @@ class FeedController extends Controller
                 return [
                     'id' => $post->id,
                     'content' => $post->content,
-                    'image_url' => $post->image_url,
+                    'image_urls' => $post->image_urls,
                     'likes_count' => $post->likes_count,
                     'comments_count' => $post->comments_count,
                     'shares_count' => $post->shares_count,
@@ -46,18 +49,15 @@ class FeedController extends Controller
     {
         $data = $request->validate([
             'content' => ['required', 'string', 'max:2000'],
-            'image' => ['nullable', 'image', 'max:5120'],
+            'images' => ['nullable', 'array', 'max:' . self::MAX_IMAGES],
+            'images.*' => ['image', 'max:5120'],
         ]);
 
-        $imagePath = null;
-
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('posts', 'public');
-        }
+        $imagePaths = $this->storeUploadedImages($this->gatherUploadedFiles($request->file('images')));
 
         $request->user()->posts()->create([
             'content' => $data['content'],
-            'image_path' => $imagePath,
+            'image_paths' => $imagePaths,
             'likes_count' => 0,
             'comments_count' => 0,
             'shares_count' => 0,
@@ -72,25 +72,28 @@ class FeedController extends Controller
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:2000'],
-            'image' => ['nullable', 'image', 'max:5120'],
+            'images' => ['nullable', 'array', 'max:' . self::MAX_IMAGES],
+            'images.*' => ['image', 'max:5120'],
             'remove_image' => ['nullable', 'boolean'],
         ]);
 
-        $imagePath = $post->image_path;
+        $imagePaths = $post->image_paths ?? [];
 
         if ($request->boolean('remove_image')) {
-            $this->deleteStoredImage($imagePath);
-            $imagePath = null;
+            $this->deleteStoredImages($imagePaths);
+            $imagePaths = [];
         }
 
-        if ($request->hasFile('image')) {
-            $this->deleteStoredImage($imagePath);
-            $imagePath = $request->file('image')->store('posts', 'public');
+        $uploadedFiles = $this->gatherUploadedFiles($request->file('images'));
+
+        if (! empty($uploadedFiles)) {
+            $this->deleteStoredImages($imagePaths);
+            $imagePaths = $this->storeUploadedImages($uploadedFiles);
         }
 
         $post->update([
             'content' => $data['content'],
-            'image_path' => $imagePath,
+            'image_paths' => $imagePaths,
         ]);
 
         return back();
@@ -100,11 +103,41 @@ class FeedController extends Controller
     {
         abort_unless($request->user()->id === $post->user_id, 403);
 
-        $this->deleteStoredImage($post->image_path);
+        $this->deleteStoredImages($post->image_paths ?? []);
 
         $post->delete();
 
         return back();
+    }
+
+    private function gatherUploadedFiles(array|UploadedFile|null $files): array
+    {
+        if ($files instanceof UploadedFile) {
+            return [$files];
+        }
+
+        if (! is_array($files)) {
+            return [];
+        }
+
+        return array_values(array_filter($files));
+    }
+
+    private function storeUploadedImages(array $files): array
+    {
+        $limited = array_slice($files, 0, self::MAX_IMAGES);
+
+        return array_map(
+            fn (UploadedFile $file) => $file->store('posts', 'public'),
+            $limited,
+        );
+    }
+
+    private function deleteStoredImages(array $paths): void
+    {
+        foreach ($paths as $path) {
+            $this->deleteStoredImage($path);
+        }
     }
 
     private function deleteStoredImage(?string $path): void

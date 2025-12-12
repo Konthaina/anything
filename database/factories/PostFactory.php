@@ -18,9 +18,9 @@ class PostFactory extends Factory
         return [
             'user_id' => User::factory(),
             'content' => fake()->paragraphs(2, true),
-            'image_path' => fake()->boolean(60)
-                ? 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80'
-                : null,
+            'image_paths' => fake()->boolean(60)
+                ? ['https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80']
+                : [],
             'likes_count' => fake()->numberBetween(4, 120),
             'comments_count' => fake()->numberBetween(0, 20),
             'shares_count' => fake()->numberBetween(0, 12),

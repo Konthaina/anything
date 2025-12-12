@@ -8,7 +8,18 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogOverlay,
+    DialogPortal,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -42,7 +53,7 @@ interface FeedUser {
 interface FeedPost {
     id: number | string;
     content: string;
-    image_url?: string | null;
+    image_urls?: string[];
     likes_count: number;
     comments_count: number;
     shares_count: number;
@@ -57,6 +68,8 @@ function safeId() {
         `${Date.now()}-${Math.random().toString(16).slice(2)}`
     );
 }
+
+const MAX_IMAGES = 7;
 
 export default function FeedPage() {
     const { posts: pagePosts, auth } = usePage<SharedData & { posts?: FeedPost[] }>().props;
@@ -75,7 +88,7 @@ export default function FeedPage() {
             .map((post) => ({
                 id: post?.id ?? safeId(),
                 content: post?.content ?? '',
-                image_url: post?.image_url ?? null,
+                image_urls: post?.image_urls ?? [],
                 likes_count: post?.likes_count ?? 0,
                 comments_count: post?.comments_count ?? 0,
                 shares_count: post?.shares_count ?? 0,
@@ -120,8 +133,19 @@ function CreatePostCard({
     getInitials: (value?: string | null) => string;
 }) {
     const { t } = useI18n();
-    const [preview, setPreview] = useState<string | null>(null);
     const [content, setContent] = useState<string>('');
+    const [previews, setPreviews] = useState<string[]>([]);
+    const previewUrlsRef = useRef<string[]>([]);
+
+    const cleanupPreviews = () => {
+        previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewUrlsRef.current = [];
+        setPreviews([]);
+    };
+
+    useEffect(() => {
+        return () => cleanupPreviews();
+    }, []);
 
     return (
         <Card className="border-border bg-card text-foreground shadow-xl">
@@ -138,28 +162,39 @@ function CreatePostCard({
                 method="post"
                 action="/feed"
                 encType="multipart/form-data"
-                data={{ content: '', image: null as File | null }}
                 onSuccess={() => {
-                    setPreview(null);
+                    cleanupPreviews();
                     setContent('');
                 }}
             >
                 {({ setData, processing, errors, reset }) => {
+                    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                        const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
+                        setData?.('images', files);
+                        cleanupPreviews();
+                        if (files.length === 0) {
+                            return;
+                        }
+                        const urls = files.map((file) => URL.createObjectURL(file));
+                        previewUrlsRef.current = urls;
+                        setPreviews(urls);
+                    };
+
                     return (
                         <>
                             <CardContent className="space-y-4">
-                            <textarea
-                                name="content"
-                                value={content}
-                                onChange={(e) => {
-                                    const next = e.target.value;
-                                    setContent(next);
-                                    setData?.('content', next);
-                                }}
-                                placeholder={t('feed.placeholder')}
-                                className="min-h-[140px] w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
-                            />
-                            <InputError message={errors.content} />
+                                <textarea
+                                    name="content"
+                                    value={content}
+                                    onChange={(e) => {
+                                        const next = e.target.value;
+                                        setContent(next);
+                                        setData?.('content', next);
+                                    }}
+                                    placeholder={t('feed.placeholder')}
+                                    className="min-h-[140px] w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+                                />
+                                <InputError message={errors.content} />
 
                                 <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -170,25 +205,23 @@ function CreatePostCard({
                                         <span>{t('feed.browse')}</span>
                                         <input
                                             type="file"
-                                            name="image"
+                                            name="images[]"
                                             accept="image/*"
+                                            multiple
                                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0] ?? null;
-                                            setData?.('image', file);
-                                            setPreview((current) => {
-                                                if (current) URL.revokeObjectURL(current);
-                                                    return file ? URL.createObjectURL(file) : null;
-                                                });
-                                            }}
+                                            onChange={handleFileChange}
                                         />
                                     </label>
                                 </div>
-                                <InputError message={errors.image} />
+                                <InputError message={errors.images} />
 
-                                {preview && (
-                                    <div className="overflow-hidden rounded-xl border border-border">
-                                        <img src={preview} alt="Preview" className="w-full object-cover" />
+                                {previews.length > 0 && (
+                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                        {previews.map((src) => (
+                                            <div key={src} className="overflow-hidden rounded-xl border border-border">
+                                                <img src={src} alt="Preview" className="w-full object-cover" />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </CardContent>
@@ -199,11 +232,9 @@ function CreatePostCard({
                                     className="text-foreground hover:bg-muted"
                                     onClick={() => {
                                         reset?.();
-                                        setPreview((current) => {
-                                            if (current) URL.revokeObjectURL(current);
-                                            return null;
-                                        });
+                                        cleanupPreviews();
                                         setContent('');
+                                        setData?.('images', []);
                                     }}
                                     disabled={processing}
                                 >
@@ -234,16 +265,21 @@ function PostCard({
     authUserId?: number;
 }) {
     const { t } = useI18n();
-    const [showImage, setShowImage] = useState(true);
+    const [hiddenImages, setHiddenImages] = useState<string[]>([]);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const isAuthor = authUserId !== undefined && authUserId === post.user.id;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
-    const sanitizedImageUrl = useMemo(() => {
-        if (!post.image_url) return null;
-        if (post.image_url.includes('via.placeholder.com')) return null;
-        return post.image_url;
-    }, [post.image_url]);
+    const sanitizedImageUrls = useMemo(() => {
+        const urls = post.image_urls ?? [];
+        return urls.filter((url) => url && !url.includes('via.placeholder.com'));
+    }, [post.image_urls]);
+    const visibleImageUrls = sanitizedImageUrls.filter((url) => !hiddenImages.includes(url));
+
+    useEffect(() => {
+        setHiddenImages([]);
+    }, [post.image_urls]);
 
     return (
         <Card className="overflow-hidden border-border bg-card text-foreground shadow-2xl">
@@ -304,14 +340,27 @@ function PostCard({
                 {(post.content ?? '').split('\n').map((line, idx) => (
                     <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                 ))}
-                {sanitizedImageUrl && showImage && (
-                    <div className="overflow-hidden rounded-2xl border border-border">
-                        <img
-                            src={sanitizedImageUrl}
-                            alt=""
-                            className="w-full object-cover"
-                            onError={() => setShowImage(false)}
-                        />
+                {visibleImageUrls.length > 0 && (
+                    <div className="grid w-full gap-2 sm:grid-cols-2">
+                        {visibleImageUrls.map((url) => (
+                            <button
+                                key={url}
+                                type="button"
+                                onClick={() => setLightboxImage(url)}
+                                className="overflow-hidden rounded-2xl border border-border transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-primary/60"
+                            >
+                                <img
+                                    src={url}
+                                    alt=""
+                                    className="block h-full w-full object-cover"
+                                    onError={() => {
+                                        setHiddenImages((prev) =>
+                                            prev.includes(url) ? prev : [...prev, url],
+                                        );
+                                    }}
+                                />
+                            </button>
+                        ))}
                     </div>
                 )}
             </CardContent>
@@ -324,6 +373,15 @@ function PostCard({
             </CardFooter>
             <EditPostDialog post={post} open={isEditOpen} onOpenChange={setIsEditOpen} />
             <DeletePostDialog postId={post.id} open={isDeleteOpen} onOpenChange={setIsDeleteOpen} />
+            <ImageViewerDialog
+                imageUrl={lightboxImage}
+                open={Boolean(lightboxImage)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setLightboxImage(null);
+                    }
+                }}
+            />
         </Card>
     );
 }
@@ -338,74 +396,69 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { t } = useI18n();
     const form = useForm({
         content: post.content ?? '',
-        image: null as File | null,
+        images: [] as File[],
         remove_image: false,
     });
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const previewBlobRef = useRef<string | null>(null);
-    const [preview, setPreview] = useState<string | null>(post.image_url ?? null);
+    const previewBlobRef = useRef<string[]>([]);
+    const [previewUrls, setPreviewUrls] = useState<string[]>(post.image_urls ?? []);
+    const [hiddenPreviewUrls, setHiddenPreviewUrls] = useState<string[]>([]);
 
     useEffect(() => {
         setData({
             content: post.content ?? '',
-            image: null,
+            images: [],
             remove_image: false,
         });
         clearErrors();
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-        if (previewBlobRef.current) {
-            URL.revokeObjectURL(previewBlobRef.current);
-            previewBlobRef.current = null;
-        }
-        setPreview(post.image_url ?? null);
-    }, [post.id, post.content, post.image_url, open, setData, clearErrors]);
+        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewBlobRef.current = [];
+        setPreviewUrls(post.image_urls ?? []);
+        setHiddenPreviewUrls([]);
+    }, [post.id, post.content, post.image_urls, open, setData, clearErrors]);
 
     useEffect(() => {
         return () => {
-            if (previewBlobRef.current) {
-                URL.revokeObjectURL(previewBlobRef.current);
-            }
+            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
         };
     }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0] ?? null;
-        form.setData('image', file);
-        form.setData('remove_image', false);
-        if (file) {
-            if (previewBlobRef.current) {
-                URL.revokeObjectURL(previewBlobRef.current);
-            }
-            const url = URL.createObjectURL(file);
-            previewBlobRef.current = url;
-            setPreview(url);
-        } else {
-            if (previewBlobRef.current) {
-                URL.revokeObjectURL(previewBlobRef.current);
-                previewBlobRef.current = null;
-            }
-            setPreview(post.image_url ?? null);
+        const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
+        setData('images', files);
+        setData('remove_image', false);
+        if (files.length === 0) {
+            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+            previewBlobRef.current = [];
+            setPreviewUrls(post.image_urls ?? []);
+            return;
         }
+        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+        const urls = files.map((file) => URL.createObjectURL(file));
+        previewBlobRef.current = urls;
+        setPreviewUrls(urls);
+        setHiddenPreviewUrls([]);
     };
 
     const handleRemoveImage = () => {
         const next = !form.data.remove_image;
-        form.setData('remove_image', next);
+        setData('remove_image', next);
         if (next) {
-            form.setData('image', null);
+            setData('images', []);
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-            if (previewBlobRef.current) {
-                URL.revokeObjectURL(previewBlobRef.current);
-                previewBlobRef.current = null;
-            }
-            setPreview(null);
+            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+            previewBlobRef.current = [];
+            setPreviewUrls([]);
+            setHiddenPreviewUrls([]);
         } else {
-            setPreview(post.image_url ?? null);
+            setPreviewUrls(post.image_urls ?? []);
+            setHiddenPreviewUrls([]);
         }
     };
 
@@ -418,6 +471,8 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
             },
         });
     };
+
+    const visiblePreviewUrls = previewUrls.filter((url) => !hiddenPreviewUrls.includes(url));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -452,13 +507,14 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                name="image"
+                                name="images[]"
                                 accept="image/*"
+                                multiple
                                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                 onChange={handleFileChange}
                             />
                         </label>
-                        <InputError message={form.errors.image} />
+                        <InputError message={form.errors.images} />
                         <div className="flex items-center justify-end">
                             <Button
                                 type="button"
@@ -471,14 +527,22 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                         </div>
                     </div>
 
-                    {preview && (
-                        <div className="overflow-hidden rounded-xl border border-border">
-                            <img
-                                src={preview}
-                                alt=""
-                                className="w-full object-cover"
-                                onError={() => setPreview(null)}
-                            />
+                    {visiblePreviewUrls.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {visiblePreviewUrls.map((url) => (
+                                <div key={url} className="overflow-hidden rounded-xl border border-border">
+                                    <img
+                                        src={url}
+                                        alt=""
+                                        className="w-full object-cover"
+                                        onError={() => {
+                                            setHiddenPreviewUrls((prev) =>
+                                                prev.includes(url) ? prev : [...prev, url],
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -527,6 +591,43 @@ function DeletePostDialog({ postId, open, onOpenChange }: DeletePostDialogProps)
                     </DialogFooter>
                 </Form>
             </DialogContent>
+        </Dialog>
+    );
+}
+
+interface ImageViewerDialogProps {
+    imageUrl: string | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogProps) {
+    const { t } = useI18n();
+
+    if (!imageUrl) {
+        return null;
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogPortal>
+                <DialogOverlay className="bg-black/80" />
+                <DialogPrimitive.Content
+                    className="fixed inset-x-4 top-[50%] z-50 max-h-[90vh] w-auto translate-y-[-50%] transform rounded-3xl bg-transparent p-0 shadow-none"
+                >
+                    <DialogPrimitive.Title className="sr-only">{t('feed.view_image')}</DialogPrimitive.Title>
+                    <DialogPrimitive.Description className="sr-only">
+                        {t('feed.view_image_description')}
+                    </DialogPrimitive.Description>
+                    <div className="flex items-center justify-center">
+                        <img
+                            src={imageUrl}
+                            alt={t('feed.view_image')}
+                            className="max-h-[90vh] w-full rounded-3xl object-contain"
+                        />
+                    </div>
+                </DialogPrimitive.Content>
+            </DialogPortal>
         </Dialog>
     );
 }
