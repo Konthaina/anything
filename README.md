@@ -1,11 +1,6 @@
 # Anything Starter (Laravel + Inertia React)
 
 <div align="center">
-
-<div align="center">
-
-<h3>Using</h3>
-
 <div style="display:flex; justify-content:center; gap:24px; align-items:center;">
   <img alt="Laravel" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-original.svg" width="56" height="56" />
   <img alt="React" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" width="56" height="56" />
