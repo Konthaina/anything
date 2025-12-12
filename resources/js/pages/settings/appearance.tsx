@@ -13,18 +13,22 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit as editAppearance } from '@/routes/appearance';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Appearance settings',
-        href: editAppearance().url,
-    },
-];
+import { useI18n } from '@/contexts/language-context';
 
 export default function Appearance() {
     const { app } = usePage<SharedData>().props;
     const siteName = app?.name ?? 'Laravel Starter Kit';
     const [preview, setPreview] = useState<string | null>(null);
+    const { t } = useI18n();
+    const breadcrumbs: BreadcrumbItem[] = useMemo(
+        () => [
+            {
+                title: t('appearance.breadcrumb'),
+                href: editAppearance().url,
+            },
+        ],
+        [t],
+    );
 
     useEffect(() => {
         return () => {
@@ -66,13 +70,13 @@ export default function Appearance() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Appearance settings" />
+            <Head title={t('appearance.title')} />
 
             <SettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall
-                        title="Appearance settings"
-                        description="Update the site name and logo"
+                        title={t('appearance.title')}
+                        description={t('appearance.description')}
                     />
 
                     <Form
@@ -94,41 +98,45 @@ export default function Appearance() {
                                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex items-center gap-3">
                                             <Avatar className="size-16 overflow-hidden rounded-lg ring-2 ring-border">
-                                                <AvatarImage
-                                                    src={logoSrc ?? undefined}
-                                                    alt={siteName}
-                                                />
-                                                <AvatarFallback className="rounded-lg bg-neutral-200 text-base font-semibold text-black dark:bg-neutral-700 dark:text-white">
-                                                    Logo
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="space-y-1 text-sm">
-                                                <p className="font-semibold text-foreground">
-                                                    Site branding
-                                                </p>
-                                                <p className="text-muted-foreground">
-                                                    Upload a logo to show in the app header and sidebar.
-                                                </p>
-                                            </div>
+                                            <AvatarImage
+                                                src={logoSrc ?? undefined}
+                                                alt={siteName}
+                                            />
+                                            <AvatarFallback className="rounded-lg bg-neutral-200 text-base font-semibold text-black dark:bg-neutral-700 dark:text-white">
+                                                {t('appearance.fallback_logo')}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="space-y-1 text-sm">
+                                            <p className="font-semibold text-foreground">
+                                                {t('appearance.branding_title')}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {t('appearance.branding_subtitle')}
+                                            </p>
                                         </div>
-                                        {preview && (
+                                    </div>
+                                    {preview && (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={resetPreview}
                                             >
-                                                Clear selection
+                                                {t('profile.photo.clear')}
                                             </Button>
                                         )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="name">Site name</Label>
+                                        <Label htmlFor="name">
+                                            {t('appearance.site_name')}
+                                        </Label>
                                         <Input
                                             id="name"
                                             name="name"
                                             defaultValue={siteName}
-                                            placeholder="Your site name"
+                                            placeholder={t(
+                                                'appearance.site_name_placeholder',
+                                            )}
                                             autoComplete="organization"
                                         />
                                         <InputError
@@ -161,10 +169,10 @@ export default function Appearance() {
                                                 </div>
                                                 <div className="flex-1">
                                                     <p className="text-sm font-medium text-foreground">
-                                                        Choose a logo file
+                                                        {t('appearance.upload_label')}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        PNG, JPG, or GIF up to 2MB. Drag & drop or click to browse.
+                                                        {t('appearance.upload_hint')}
                                                     </p>
                                                 </div>
                                                 <Button
@@ -173,7 +181,7 @@ export default function Appearance() {
                                                     className="pointer-events-none"
                                                     type="button"
                                                 >
-                                                    Browse
+                                                    {t('profile.photo.browse')}
                                                 </Button>
                                             </div>
                                             <Input
@@ -195,7 +203,9 @@ export default function Appearance() {
                                 <AppearanceTabs />
 
                                 <div className="flex items-center gap-4">
-                                    <Button disabled={processing}>Save changes</Button>
+                                    <Button disabled={processing}>
+                                        {t('appearance.save')}
+                                    </Button>
                                 </div>
                             </>
                         )}

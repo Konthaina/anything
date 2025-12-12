@@ -6,46 +6,51 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
+import { useI18n } from '@/contexts/language-context';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { type PropsWithChildren } from 'react';
+import { type PropsWithChildren, useMemo } from 'react';
 
 export default function SettingsLayout({
     children,
     wide = false,
 }: PropsWithChildren<{ wide?: boolean }>) {
     const { canManageUsers } = usePage<SharedData>().props;
-    const sidebarNavItems: NavItem[] = [
-        {
-            title: 'Profile',
-            href: edit(),
-            icon: null,
-        },
-        {
-            title: 'Password',
-            href: editPassword(),
-            icon: null,
-        },
-        {
-            title: 'Two-Factor Auth',
-            href: show(),
-            icon: null,
-        },
-        {
-            title: 'Appearance',
-            href: editAppearance(),
-            icon: null,
-        },
-        ...(canManageUsers
-            ? [
-                  {
-                      title: 'User Management',
-                      href: '/settings/admin',
-                      icon: null,
-                  },
-              ]
-            : []),
-    ];
+    const { t } = useI18n();
+    const sidebarNavItems: NavItem[] = useMemo(
+        () => [
+            {
+                title: t('settings.nav.profile'),
+                href: edit(),
+                icon: null,
+            },
+            {
+                title: t('settings.nav.password'),
+                href: editPassword(),
+                icon: null,
+            },
+            {
+                title: t('settings.nav.two_factor'),
+                href: show(),
+                icon: null,
+            },
+            {
+                title: t('settings.nav.appearance'),
+                href: editAppearance(),
+                icon: null,
+            },
+            ...(canManageUsers
+                ? [
+                      {
+                          title: t('settings.nav.users'),
+                          href: '/settings/admin',
+                          icon: null,
+                      },
+                  ]
+                : []),
+        ],
+        [canManageUsers, t],
+    );
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
@@ -57,8 +62,8 @@ export default function SettingsLayout({
     return (
         <div className="px-4 py-6">
             <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
+                title={t('settings.title')}
+                description={t('settings.description')}
             />
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">

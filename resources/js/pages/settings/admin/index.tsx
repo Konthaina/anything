@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { useI18n } from '@/contexts/language-context';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 
 interface Role {
@@ -52,8 +53,6 @@ interface Paginated<T> {
     };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'User management', href: '/settings/admin' }];
-
 export default function AdminSettings() {
     const { users, roles, permissions, canManageRoles, filters } = usePage<
         SharedData & {
@@ -63,30 +62,35 @@ export default function AdminSettings() {
             filters?: { search?: string };
         }
     >().props;
+    const { t } = useI18n();
 
     const [editingId, setEditingId] = useState<number | null>(null);
     const [search, setSearch] = useState(() => filters?.search ?? '');
     const [activeTab, setActiveTab] = useState<'users' | 'roles'>(
         canManageRoles ? 'users' : 'users',
     );
+    const breadcrumbs: BreadcrumbItem[] = useMemo(
+        () => [{ title: t('admin.breadcrumb'), href: '/settings/admin' }],
+        [t],
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="User management" />
+            <Head title={t('admin.title')} />
             <SettingsLayout wide>
                 <div className="space-y-6">
                     <HeadingSmall
-                        title="User management"
-                        description="Create users, assign roles, and manage permissions"
+                        title={t('admin.title')}
+                        description={t('admin.description')}
                     />
 
                     <div className="flex items-center gap-6 pb-3">
                         {(
                             [
-                                ['users', 'Users'],
+                                ['users', t('admin.tabs.users')],
                                 ...(canManageRoles
                                     ? ([
-                                          ['roles', 'Roles and Permissions'],
+                                          ['roles', t('admin.tabs.roles')],
                                       ] as const)
                                     : []),
                             ] as const
@@ -127,18 +131,18 @@ export default function AdminSettings() {
                                                     setSearch(e.target.value);
                                                     setData('search', e.target.value);
                                                 }}
-                                                placeholder="Search users..."
+                                                placeholder={t('admin.search_placeholder')}
                                                 className="w-56"
                                             />
                                             <Button size="sm" variant="secondary" type="submit" disabled={processing}>
-                                                Search
+                                                {t('common.search')}
                                             </Button>
                                             {search && (
                                                 <Link
                                                     href="/settings/admin"
                                                     className="text-sm text-muted-foreground underline-offset-4 hover:underline"
                                                 >
-                                                    Clear
+                                                    {t('common.clear')}
                                                 </Link>
                                             )}
                                         </div>
@@ -149,11 +153,11 @@ export default function AdminSettings() {
                             <div className="overflow-x-auto rounded-lg border border-border">
                                 <div className="min-w-[880px]">
                                     <div className="grid grid-cols-12 items-center gap-3 bg-muted/70 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                        <span className="col-span-5">Name</span>
-                                        <span className="col-span-3">Email</span>
-                                        <span className="col-span-2">Role</span>
-                                        <span className="col-span-1 text-center">Updated</span>
-                                        <span className="col-span-1 text-right">Action</span>
+                                        <span className="col-span-5">{t('common.name')}</span>
+                                        <span className="col-span-3">{t('common.email')}</span>
+                                        <span className="col-span-2">{t('common.role')}</span>
+                                        <span className="col-span-1 text-center">{t('common.updated')}</span>
+                                        <span className="col-span-1 text-right">{t('common.action')}</span>
                                     </div>
                                     <div className="divide-y divide-border">
                                         {users.data.map((user) => (
@@ -179,9 +183,11 @@ export default function AdminSettings() {
                         <div className="space-y-4 rounded-lg border border-border bg-background/80 p-4 shadow-sm sm:p-5">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <h3 className="text-base font-semibold text-foreground">Roles & permissions</h3>
+                                    <h3 className="text-base font-semibold text-foreground">
+                                        {t('admin.roles_section.title')}
+                                    </h3>
                                     <p className="text-sm text-muted-foreground">
-                                        Create roles and attach permissions.
+                                        {t('admin.roles_section.description')}
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -224,6 +230,7 @@ function UserRow({
     const [email, setEmail] = useState(() => user.email);
     const [password, setPassword] = useState('');
     const [showConfirm, setShowConfirm] = useState(false);
+    const { t } = useI18n();
 
     const rolesAction = `/settings/admin/users/${user.id}/roles`;
     const updateAction = `/settings/admin/users/${user.id}`;
@@ -261,15 +268,19 @@ function UserRow({
                             {role.name}
                         </Badge>
                     ))}
-                    {user.roles.length === 0 && <span className="text-xs text-muted-foreground">No role</span>}
+                    {user.roles.length === 0 && (
+                        <span className="text-xs text-muted-foreground">
+                            {t('admin.table.no_role')}
+                        </span>
+                    )}
                 </div>
             </div>
             <div className="col-span-1 text-center text-sm text-muted-foreground">
-                {user.updated_at ? formatDate(user.updated_at) : '—'}
+                {user.updated_at ? formatDate(user.updated_at) : t('common.not_available')}
             </div>
             <div className="col-span-1 text-right text-sm font-semibold text-primary">
                 <button type="button" className="underline-offset-4 hover:underline" onClick={onToggleEdit}>
-                    {isEditing ? 'Close' : 'Edit'}
+                    {isEditing ? t('common.close') : t('common.edit')}
                 </button>
             </div>
 
@@ -281,7 +292,9 @@ function UserRow({
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <input type="hidden" name="_method" value="PATCH" />
                                     <div className="grid gap-1">
-                                        <Label className="text-xs text-muted-foreground">Name</Label>
+                                        <Label className="text-xs text-muted-foreground">
+                                            {t('common.name')}
+                                        </Label>
                                         <Input
                                             name="name"
                                             value={name}
@@ -293,7 +306,9 @@ function UserRow({
                                         <InputError message={updateErrors.name} />
                                     </div>
                                     <div className="grid gap-1">
-                                        <Label className="text-xs text-muted-foreground">Email</Label>
+                                        <Label className="text-xs text-muted-foreground">
+                                            {t('common.email')}
+                                        </Label>
                                         <Input
                                             name="email"
                                             value={email}
@@ -307,7 +322,7 @@ function UserRow({
                                     </div>
                                     <div className="grid gap-1">
                                         <Label className="text-xs text-muted-foreground">
-                                            Password (leave blank to keep)
+                                            {t('admin.table.password_hint')}
                                         </Label>
                                         <Input
                                             name="password"
@@ -318,13 +333,13 @@ function UserRow({
                                                 setPassword(next);
                                                 setUpdateData('password', next === '' ? null : next);
                                             }}
-                                            placeholder="********"
+                                            placeholder={t('admin.create_user.password_placeholder')}
                                         />
                                         <InputError message={updateErrors.password} />
                                     </div>
                                     <div className="sm:col-span-3 flex gap-2">
                                         <Button size="sm" disabled={updating} type="submit">
-                                            Save user
+                                            {t('admin.table.save_user')}
                                         </Button>
                                     </div>
                                 </div>
@@ -343,19 +358,19 @@ function UserRow({
                                             type="button"
                                             onClick={() => setShowConfirm(true)}
                                         >
-                                            Delete user
+                                            {t('admin.table.delete_user')}
                                         </Button>
 
                                         {showConfirm && (
                                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
                                                 <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg ring-1 ring-border">
                                                     <h3 className="text-base font-semibold text-foreground">
-                                                        Delete user
+                                                        {t('admin.table.delete_user_title')}
                                                     </h3>
                                                     <p className="mt-2 text-sm text-muted-foreground">
-                                                        Are you sure you want to delete{' '}
-                                                        <span className="font-semibold text-foreground">{user.name}</span>?
-                                                        This action cannot be undone.
+                                                        {t('admin.table.delete_user_confirm', {
+                                                            name: user.name,
+                                                        })}
                                                     </p>
                                                     <div className="mt-4 flex justify-end gap-2">
                                                         <Button
@@ -363,7 +378,7 @@ function UserRow({
                                                             variant="secondary"
                                                             onClick={() => setShowConfirm(false)}
                                                         >
-                                                            Cancel
+                                                            {t('common.cancel')}
                                                         </Button>
                                                         <Button
                                                             type="button"
@@ -375,7 +390,7 @@ function UserRow({
                                                                 submit();
                                                             }}
                                                         >
-                                                            Confirm delete
+                                                            {t('admin.table.confirm_delete')}
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -420,7 +435,7 @@ function UserRow({
 
                                     <div className="mt-3 flex items-center gap-3">
                                         <Button size="sm" disabled={processing} type="submit">
-                                            Save roles
+                                            {t('admin.table.save_roles')}
                                         </Button>
                                         <InputError message={errors.roles} />
                                     </div>
@@ -444,6 +459,7 @@ function RolePermissionsForm({
     const [selected, setSelected] = useState<number[]>(() => role.permissions?.map((perm) => perm.id) ?? []);
     const [roleName, setRoleName] = useState(() => role.name);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const { t } = useI18n();
 
     const action = `/settings/admin/roles/${role.id}/permissions`;
 
@@ -464,7 +480,7 @@ function RolePermissionsForm({
                                 className="w-40 sm:w-56"
                             />
                             <Button size="sm" type="submit" disabled={processing || role.slug === 'admin'}>
-                                Rename
+                                {t('admin.roles_section.rename')}
                             </Button>
                             <InputError message={errors.name} />
                         </div>
@@ -483,19 +499,19 @@ function RolePermissionsForm({
                                     disabled={processing || role.slug === 'admin'}
                                     onClick={() => setShowDeleteConfirm(true)}
                                 >
-                                    Delete role
+                                    {t('admin.roles_section.delete_role')}
                                 </Button>
 
                                 {showDeleteConfirm && (
                                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
                                         <div className="w-full max-w-md rounded-lg bg-background p-5 shadow-lg ring-1 ring-border">
                                             <h3 className="text-base font-semibold text-foreground">
-                                                Delete role
+                                                {t('admin.roles_section.delete_role')}
                                             </h3>
                                             <p className="mt-2 text-sm text-muted-foreground">
-                                                Are you sure you want to delete{' '}
-                                                <span className="font-semibold text-foreground">{role.name}</span>?
-                                                This will remove the role and detach it from all users.
+                                                {t('admin.roles_section.delete_role_confirm', {
+                                                    role: role.name,
+                                                })}
                                             </p>
                                             <div className="mt-4 flex justify-end gap-2">
                                                 <Button
@@ -503,7 +519,7 @@ function RolePermissionsForm({
                                                     variant="secondary"
                                                     onClick={() => setShowDeleteConfirm(false)}
                                                 >
-                                                    Cancel
+                                                    {t('common.cancel')}
                                                 </Button>
                                                 <Button
                                                     type="button"
@@ -515,7 +531,7 @@ function RolePermissionsForm({
                                                         submit();
                                                     }}
                                                 >
-                                                    Confirm delete
+                                                    {t('admin.table.confirm_delete')}
                                                 </Button>
                                             </div>
                                         </div>
@@ -532,7 +548,9 @@ function RolePermissionsForm({
                     <>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {selected.length === 0 ? (
-                                <Badge variant="secondary">No permissions</Badge>
+                                <Badge variant="secondary">
+                                    {t('admin.roles_section.no_permissions')}
+                                </Badge>
                             ) : (
                                 selected.map((permissionId) => {
                                     const perm = permissions.find((p) => p.id === permissionId);
@@ -577,7 +595,7 @@ function RolePermissionsForm({
                             ))}
                             <input type="hidden" name="_method" value="PATCH" />
                             <Button size="sm" disabled={processing}>
-                                Save permissions
+                                {t('admin.roles_section.save_permissions')}
                             </Button>
                             <InputError message={errors.permissions} />
                         </div>
@@ -591,6 +609,7 @@ function RolePermissionsForm({
 function CreateRoleForm() {
     const [name, setName] = useState('');
     const action = '/settings/admin/roles';
+    const { t } = useI18n();
 
     return (
         <Form method="post" action={action} data={{ name }}>
@@ -598,7 +617,7 @@ function CreateRoleForm() {
                 <div className="flex items-center gap-2">
                     <Input
                         name="name"
-                        placeholder="New role"
+                        placeholder={t('admin.roles_section.new_role_placeholder')}
                         value={name}
                         onChange={(e) => {
                             setName(e.target.value);
@@ -607,7 +626,7 @@ function CreateRoleForm() {
                         className="w-36"
                     />
                     <Button size="sm" disabled={processing} type="submit">
-                        Add role
+                        {t('admin.roles_section.add_role')}
                     </Button>
                     <InputError message={errors.name} />
                 </div>
@@ -621,13 +640,16 @@ function CreateUserForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const action = '/settings/admin/users';
+    const { t } = useI18n();
 
     return (
         <Form method="post" action={action} data={{ name, email, password }}>
             {({ setData, processing, errors }) => (
                 <div className="grid gap-2 rounded-md border border-border bg-background p-3 sm:grid-cols-3 sm:gap-3 sm:p-4">
                     <div className="grid gap-1">
-                        <Label className="text-xs text-muted-foreground">Name</Label>
+                        <Label className="text-xs text-muted-foreground">
+                            {t('common.name')}
+                        </Label>
                         <Input
                             name="name"
                             value={name}
@@ -635,12 +657,14 @@ function CreateUserForm() {
                                 setName(e.target.value);
                                 setData('name', e.target.value);
                             }}
-                            placeholder="New user name"
+                            placeholder={t('admin.create_user.name_placeholder')}
                         />
                         <InputError message={errors.name} />
                     </div>
                     <div className="grid gap-1">
-                        <Label className="text-xs text-muted-foreground">Email</Label>
+                        <Label className="text-xs text-muted-foreground">
+                            {t('common.email')}
+                        </Label>
                         <Input
                             name="email"
                             value={email}
@@ -648,26 +672,28 @@ function CreateUserForm() {
                                 setEmail(e.target.value);
                                 setData('email', e.target.value);
                             }}
-                            placeholder="user@example.com"
+                            placeholder={t('admin.create_user.email_placeholder')}
                             type="email"
                         />
                         <InputError message={errors.email} />
                     </div>
                     <div className="grid gap-1">
-                        <Label className="text-xs text-muted-foreground">Password</Label>
+                        <Label className="text-xs text-muted-foreground">
+                            {t('auth.password_label')}
+                        </Label>
                         <div className="flex items-center gap-2">
                             <Input
                                 name="password"
                                 value={password}
                                 onChange={(e) => {
-                                    setPassword(e.target.value);
-                                    setData('password', e.target.value);
-                                }}
-                                placeholder="Min 8 characters"
+                                setPassword(e.target.value);
+                                setData('password', e.target.value);
+                            }}
+                                placeholder={t('admin.create_user.password_placeholder')}
                                 type="password"
                             />
                             <Button size="sm" disabled={processing} type="submit">
-                                Add
+                                {t('admin.create_user.add')}
                             </Button>
                         </div>
                         <InputError message={errors.password} />
@@ -685,13 +711,14 @@ function Pagination({
     links: { url: string | null; label: string; active: boolean }[];
     meta?: { current_page: number; last_page: number; from: number | null; to: number | null; total: number };
 }) {
+    const { t } = useI18n();
     if (!links || links.length === 0) return null;
 
     return (
         <div className="flex flex-col items-center gap-2 bg-background px-3 py-2 text-sm">
             {meta && meta.total > 0 && (
                 <div className="text-muted-foreground text-center">
-                    Showing {meta.from ?? 0}–{meta.to ?? 0} of {meta.total}
+                    {t('admin.pagination', { from: meta.from ?? 0, to: meta.to ?? 0, total: meta.total })}
                 </div>
             )}
             {links?.length ? (
@@ -700,9 +727,9 @@ function Pagination({
                         const isPrev = idx === 0;
                         const isNext = idx === links.length - 1;
                         const label = isPrev
-                            ? 'Previous'
+                            ? t('common.previous')
                             : isNext
-                              ? 'Next'
+                              ? t('common.next')
                               : link.label.replace(/&laquo;|&raquo;|;/g, '');
 
                         const disabled = !link.url;
