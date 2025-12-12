@@ -2,10 +2,32 @@
 
 <div align="center">
 
-<img alt="Laravel" src="https://img.shields.io/badge/-FF2D20?logo=laravel&logoColor=white&style=for-the-badge&label=" />
-<img alt="React" src="https://img.shields.io/badge/-61DAFB?logo=react&logoColor=20232a&style=for-the-badge&label=" />
-<img alt="TypeScript" src="https://img.shields.io/badge/-3178C6?logo=typescript&logoColor=white&style=for-the-badge&label=" />
-<img alt="Tailwind CSS" src="https://img.shields.io/badge/-38B2AC?logo=tailwindcss&logoColor=white&style=for-the-badge&label=" />
+<div align="center">
+
+<h3>Using</h3>
+
+<table>
+  <tr>
+    <td align="center" width="120">
+      <img alt="Laravel" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-plain.svg" width="56" height="56" />
+      <div>Laravel</div>
+    </td>
+    <td align="center" width="120">
+      <img alt="React" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" width="56" height="56" />
+      <div>React</div>
+    </td>
+    <td align="center" width="120">
+      <img alt="TypeScript" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="56" height="56" />
+      <div>TypeScript</div>
+    </td>
+    <td align="center" width="120">
+      <img alt="Tailwind CSS" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg" width="56" height="56" />
+      <div>Tailwind CSS</div>
+    </td>
+  </tr>
+</table>
+
+</div>
 
 </div>
 
