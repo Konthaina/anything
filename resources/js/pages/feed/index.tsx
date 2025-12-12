@@ -192,7 +192,7 @@ function CreatePostCard({
                                     </div>
                                 )}
                             </CardContent>
-                            <CardFooter className="flex items-center justify-end gap-3 border-t border-border pt-4">
+                            <CardFooter className="flex items-center justify-end gap-3 pt-4">
                                 <Button
                                     type="button"
                                     variant="ghost"
