@@ -106,7 +106,7 @@
         "description": "Update your name and email address",
         "photo": {
             "title": "Profile photo",
-            "hint": "PNG, JPG, or GIF up to 2MB.",
+            "hint": "PNG, JPG, or GIF up to 5MB.",
             "new": "New photo selected - save to apply",
             "saved": "Showing saved photo",
             "clear": "Clear selection",
@@ -151,7 +151,7 @@
         "site_name": "Site name",
         "site_name_placeholder": "Your site name",
         "upload_label": "Choose a logo file",
-        "upload_hint": "PNG, JPG, or GIF up to 2MB. Drag & drop or click to browse.",
+        "upload_hint": "PNG, JPG, or GIF up to 5MB. Drag & drop or click to browse.",
         "fallback_logo": "Logo",
         "save": "Save changes"
     },
