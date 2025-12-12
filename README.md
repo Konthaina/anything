@@ -6,26 +6,12 @@
 
 <h3>Using</h3>
 
-<table>
-  <tr>
-    <td align="center" width="120">
-      <img alt="Laravel" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-plain.svg" width="56" height="56" />
-      <div>Laravel</div>
-    </td>
-    <td align="center" width="120">
-      <img alt="React" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" width="56" height="56" />
-      <div>React</div>
-    </td>
-    <td align="center" width="120">
-      <img alt="TypeScript" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="56" height="56" />
-      <div>TypeScript</div>
-    </td>
-    <td align="center" width="120">
-      <img alt="Tailwind CSS" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg" width="56" height="56" />
-      <div>Tailwind CSS</div>
-    </td>
-  </tr>
-</table>
+<div style="display:flex; justify-content:center; gap:24px; align-items:center;">
+  <img alt="Laravel" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/laravel/laravel-original.svg" width="56" height="56" />
+  <img alt="React" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg" width="56" height="56" />
+  <img alt="TypeScript" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" width="56" height="56" />
+  <img alt="Tailwind CSS" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg" width="56" height="56" />
+</div>
 
 </div>
 
