@@ -302,7 +302,7 @@ function PostCard({
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-relaxed text-foreground">
                 {(post.content ?? '').split('\n').map((line, idx) => (
-                    <p key={idx}>{line}</p>
+                    <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                 ))}
                 {sanitizedImageUrl && showImage && (
                     <div className="overflow-hidden rounded-2xl border border-border">
@@ -563,4 +563,38 @@ function formatRelativeTime(value: string): string {
     if (days < 7) return `${days}d ago`;
 
     return date.toLocaleDateString();
+}
+
+const URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
+
+function renderLineWithLinks(line: string, index: number): React.ReactNode[] | React.ReactNode {
+    const fragments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = URL_REGEX.exec(line))) {
+        const url = match[0];
+        const start = match.index;
+        if (start > lastIndex) {
+            fragments.push(line.slice(lastIndex, start));
+        }
+        fragments.push(
+            <a
+                key={`link-${index}-${start}`}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+            >
+                {url}
+            </a>,
+        );
+        lastIndex = start + url.length;
+    }
+
+    if (lastIndex < line.length) {
+        fragments.push(line.slice(lastIndex));
+    }
+
+    return fragments.length === 0 ? line : fragments;
 }
