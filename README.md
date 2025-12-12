@@ -2,10 +2,10 @@
 
 <div align="center">
 
-![Laravel](https://img.shields.io/badge/Laravel-FF2D20?logo=laravel&logoColor=white&style=for-the-badge)
-![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=20232a&style=for-the-badge)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=for-the-badge)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwindcss&logoColor=white&style=for-the-badge)
+<img alt="Laravel" src="https://img.shields.io/badge/-FF2D20?logo=laravel&logoColor=white&style=for-the-badge&label=" />
+<img alt="React" src="https://img.shields.io/badge/-61DAFB?logo=react&logoColor=20232a&style=for-the-badge&label=" />
+<img alt="TypeScript" src="https://img.shields.io/badge/-3178C6?logo=typescript&logoColor=white&style=for-the-badge&label=" />
+<img alt="Tailwind CSS" src="https://img.shields.io/badge/-38B2AC?logo=tailwindcss&logoColor=white&style=for-the-badge&label=" />
 
 </div>
 
