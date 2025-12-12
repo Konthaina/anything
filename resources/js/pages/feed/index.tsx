@@ -74,7 +74,7 @@ const MAX_IMAGES = 7;
 
 export default function FeedPage() {
     const { posts: pagePosts, auth } = usePage<SharedData & { posts?: FeedPost[] }>().props;
-    const posts = pagePosts ?? [];
+    const posts = useMemo(() => pagePosts ?? [], [pagePosts]);
     const authUserId = auth?.user?.id;
     const { t } = useI18n();
     const breadcrumbs: BreadcrumbItem[] = useMemo(
@@ -110,9 +110,17 @@ export default function FeedPage() {
                 {auth?.user && <CreatePostCard currentUser={auth.user as FeedUser} getInitials={getInitials} />}
 
                 <div className="space-y-4">
-                    {normalizedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} getInitials={getInitials} authUserId={authUserId} />
-                    ))}
+                    {normalizedPosts.map((post) => {
+                        const imageSignature = (post.image_urls ?? []).join('|');
+                        return (
+                            <PostCard
+                                key={`${post.id}-${imageSignature}`}
+                                post={post}
+                                getInitials={getInitials}
+                                authUserId={authUserId}
+                            />
+                        );
+                    })}
                     {normalizedPosts.length === 0 && (
                         <Card className="border-slate-800 bg-slate-900/80 text-slate-100">
                             <CardContent className="py-10 text-center text-sm text-slate-400">
@@ -284,10 +292,6 @@ function PostCard({
                 ? 'grid-cols-2'
                 : 'grid-cols-2 sm:grid-cols-3';
 
-    useEffect(() => {
-        setHiddenImages([]);
-    }, [post.image_urls]);
-
     return (
         <Card className="overflow-hidden border-border bg-card text-foreground shadow-2xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
@@ -393,7 +397,12 @@ function PostCard({
                     <ActionButton icon={Share2} label={t('feed.share')} />
                 </div>
             </CardFooter>
-            <EditPostDialog post={post} open={isEditOpen} onOpenChange={setIsEditOpen} />
+            <EditPostDialog
+                key={`edit-dialog-${post.id}-${isEditOpen ? 'open' : 'closed'}`}
+                post={post}
+                open={isEditOpen}
+                onOpenChange={setIsEditOpen}
+            />
             <DeletePostDialog postId={post.id} open={isDeleteOpen} onOpenChange={setIsDeleteOpen} />
             <ImageViewerDialog
                 imageUrl={lightboxImage}
@@ -424,7 +433,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const previewBlobRef = useRef<string[]>([]);
-    const [previewUrls, setPreviewUrls] = useState<string[]>(post.image_urls ?? []);
+    const [previewBlobUrls, setPreviewBlobUrls] = useState<string[]>([]);
     const [hiddenPreviewUrls, setHiddenPreviewUrls] = useState<string[]>([]);
 
     useEffect(() => {
@@ -439,8 +448,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         }
         previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
         previewBlobRef.current = [];
-        setPreviewUrls(post.image_urls ?? []);
-        setHiddenPreviewUrls([]);
     }, [post.id, post.content, post.image_urls, open, setData, clearErrors]);
 
     useEffect(() => {
@@ -453,22 +460,22 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
         setData('images', files);
         setData('remove_image', false);
+        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewBlobRef.current = [];
+        setHiddenPreviewUrls([]);
+        setPreviewBlobUrls([]);
         if (files.length === 0) {
-            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
-            previewBlobRef.current = [];
-            setPreviewUrls(post.image_urls ?? []);
             return;
         }
-        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
         const urls = files.map((file) => URL.createObjectURL(file));
         previewBlobRef.current = urls;
-        setPreviewUrls(urls);
-        setHiddenPreviewUrls([]);
+        setPreviewBlobUrls(urls);
     };
 
     const handleRemoveImage = () => {
         const next = !form.data.remove_image;
         setData('remove_image', next);
+        setPreviewBlobUrls([]);
         if (next) {
             setData('images', []);
             if (fileInputRef.current) {
@@ -476,10 +483,8 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
             }
             previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
             previewBlobRef.current = [];
-            setPreviewUrls([]);
             setHiddenPreviewUrls([]);
         } else {
-            setPreviewUrls(post.image_urls ?? []);
             setHiddenPreviewUrls([]);
         }
     };
@@ -494,7 +499,12 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         });
     };
 
-    const visiblePreviewUrls = previewUrls.filter((url) => !hiddenPreviewUrls.includes(url));
+    const previewSources = form.data.remove_image
+        ? []
+        : previewBlobUrls.length > 0
+            ? previewBlobUrls
+            : post.image_urls ?? [];
+    const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewUrls.includes(url));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
