@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
+use App\Http\Controllers\FeedController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -14,6 +15,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+
+    Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
+    Route::post('feed', [FeedController::class, 'store'])->name('feed.store');
+    Route::put('feed/{post}', [FeedController::class, 'update'])->name('feed.update');
+    Route::delete('feed/{post}', [FeedController::class, 'destroy'])->name('feed.destroy');
 });
 
 require __DIR__.'/settings.php';

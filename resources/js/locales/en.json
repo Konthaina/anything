@@ -41,6 +41,7 @@
     },
     "nav": {
         "dashboard": "Dashboard",
+        "feed": "Feed",
         "repository": "Repository",
         "documentation": "Documentation",
         "platform": "Platform",
@@ -268,5 +269,33 @@
         "en": "English",
         "km": "Khmer",
         "switch_to": "Switch to {language}"
+    },
+    "feed": {
+        "title": "Feed",
+        "empty": "No posts yet. Be the first to share something!",
+        "create_title": "Create a post",
+        "placeholder": "Share an update with your team...",
+        "attach_image": "Attach an image",
+        "browse": "Browse",
+        "clear": "Clear",
+        "post": "Post",
+        "comments": "comments",
+        "shares": "shares",
+        "like": "Like",
+        "comment": "Comment",
+        "share": "Share",
+        "edit": "Edit post",
+        "delete": "Delete post",
+        "edit_title": "Edit post",
+        "edit_description": "Update the content or image of your post.",
+        "update": "Save changes",
+        "remove_image": "Remove image",
+        "clear_selection": "Clear selection",
+        "delete_confirm_title": "Delete post",
+        "delete_confirm_description": "This action cannot be undone.",
+        "delete_confirm": "Delete post",
+        "visibility": {
+            "public": "Public"
+        }
     }
 }

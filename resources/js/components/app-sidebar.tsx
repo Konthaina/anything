@@ -14,7 +14,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Newspaper } from 'lucide-react';
 import { useMemo } from 'react';
 import AppLogo from './app-logo';
 
@@ -27,6 +27,11 @@ export function AppSidebar() {
                 title: t('nav.dashboard'),
                 href: dashboard(),
                 icon: LayoutGrid,
+            },
+            {
+                title: t('nav.feed'),
+                href: '/feed',
+                icon: Newspaper,
             },
         ],
         [t],

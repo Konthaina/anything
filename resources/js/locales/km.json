@@ -41,6 +41,7 @@
     },
     "nav": {
         "dashboard": "ផ្ទាំងគ្រប់គ្រង",
+        "feed": "ហ្វីដ",
         "repository": "ឃ្លាំងកូដ",
         "documentation": "ឯកសារ",
         "platform": "វេទិកា",
@@ -268,5 +269,33 @@
         "en": "EN",
         "km": "KH",
         "switch_to": "ប្ដូរទៅ {language}"
+    },
+    "feed": {
+        "title": "ហ្វីដ",
+        "empty": "មិនទាន់មានប្រកាសទេ។ សូមជាអ្នកដំបូងដែលចែករំលែកអ្វីមួយ!",
+        "create_title": "បង្កើតប្រកាស",
+        "placeholder": "ចែករំលែកព័ត៌មានអាប់ដេតជាមួយក្រុមរបស់អ្នក...",
+        "attach_image": "ភ្ជាប់រូបភាព",
+        "browse": "រកមើល",
+        "clear": "សម្អាត",
+        "post": "បង្ហោះ",
+        "comments": "មតិយោបល់",
+        "shares": "ការចែករំលែក",
+        "like": "ចូលចិត្ត",
+        "comment": "បញ្ចេញមតិ",
+        "share": "ចែករំលែក",
+        "edit": "កែសម្រួលប្រកាស",
+        "delete": "លុបប្រកាស",
+        "edit_title": "កែសម្រួលប្រកាស",
+        "edit_description": "ធ្វើឲ្យខ្លឹមសារឬរូបភាពរបស់អ្នកទាន់សម័យ។",
+        "update": "រក្សាទុក",
+        "remove_image": "លុបរូបភាព",
+        "clear_selection": "បោះបង់ការជ្រើសរើស",
+        "delete_confirm_title": "លុបប្រកាស",
+        "delete_confirm_description": "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។",
+        "delete_confirm": "លុបប្រកាស",
+        "visibility": {
+            "public": "សាធារណៈ"
+        }
     }
 }
