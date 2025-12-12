@@ -18,6 +18,8 @@ import { useI18n } from '@/contexts/language-context';
 export default function Appearance() {
     const { app } = usePage<SharedData>().props;
     const siteName = app?.name ?? 'Laravel Starter Kit';
+    const logo = app?.logo;
+    const updatedAt = app?.updated_at;
     const [preview, setPreview] = useState<string | null>(null);
     const { t } = useI18n();
     const breadcrumbs: BreadcrumbItem[] = useMemo(
@@ -63,10 +65,10 @@ export default function Appearance() {
 
     const logoSrc = useMemo(() => {
         if (preview) return preview;
-        if (!app?.logo) return null;
+        if (!logo) return null;
 
-        return `${app.logo}${app.updated_at ? `?v=${encodeURIComponent(app.updated_at)}` : ''}`;
-    }, [preview, app?.logo, app?.updated_at]);
+        return `${logo}${updatedAt ? `?v=${encodeURIComponent(updatedAt)}` : ''}`;
+    }, [preview, logo, updatedAt]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
