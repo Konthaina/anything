@@ -7,6 +7,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
@@ -69,6 +78,7 @@ export default function AdminSettings() {
     const [activeTab, setActiveTab] = useState<'users' | 'roles'>(
         canManageRoles ? 'users' : 'users',
     );
+    const [createOpen, setCreateOpen] = useState(false);
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('admin.breadcrumb'), href: '/settings/admin' }],
         [t],
@@ -120,7 +130,24 @@ export default function AdminSettings() {
                     {activeTab === 'users' && (
                         <div className="space-y-4 rounded-lg border border-border bg-background/90 p-4 shadow-sm">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <CreateUserForm />
+                                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm">
+                                            {t('admin.create_user.add')}
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>{t('admin.create_user.add')}</DialogTitle>
+                                            <DialogDescription>
+                                                {t('admin.create_user.description') ??
+                                                    t('admin.create_user.name_placeholder')}
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <CreateUserForm onCreated={() => setCreateOpen(false)} />
+                                        <DialogFooter />
+                                    </DialogContent>
+                                </Dialog>
                                 <Form method="get" action="/settings/admin" data={{ search }}>
                                     {({ setData, processing }) => (
                                         <div className="flex items-center gap-2">
@@ -635,7 +662,7 @@ function CreateRoleForm() {
     );
 }
 
-function CreateUserForm() {
+function CreateUserForm({ onCreated }: { onCreated?: () => void }) {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -643,9 +670,19 @@ function CreateUserForm() {
     const { t } = useI18n();
 
     return (
-        <Form method="post" action={action} data={{ name, email, password }}>
+        <Form
+            method="post"
+            action={action}
+            data={{ name, email, password }}
+            onSuccess={() => {
+                setName('');
+                setEmail('');
+                setPassword('');
+                onCreated?.();
+            }}
+        >
             {({ setData, processing, errors }) => (
-                <div className="grid gap-2 rounded-md border border-border bg-background p-3 sm:grid-cols-3 sm:gap-3 sm:p-4">
+                <div className="grid gap-3">
                     <div className="grid gap-1">
                         <Label className="text-xs text-muted-foreground">
                             {t('common.name')}
@@ -681,22 +718,30 @@ function CreateUserForm() {
                         <Label className="text-xs text-muted-foreground">
                             {t('auth.password_label')}
                         </Label>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                name="password"
-                                value={password}
-                                onChange={(e) => {
+                        <Input
+                            name="password"
+                            value={password}
+                            onChange={(e) => {
                                 setPassword(e.target.value);
                                 setData('password', e.target.value);
                             }}
-                                placeholder={t('admin.create_user.password_placeholder')}
-                                type="password"
-                            />
-                            <Button size="sm" disabled={processing} type="submit">
-                                {t('admin.create_user.add')}
-                            </Button>
-                        </div>
+                            placeholder={t('admin.create_user.password_placeholder')}
+                            type="password"
+                        />
                         <InputError message={errors.password} />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            type="button"
+                            onClick={onCreated}
+                        >
+                            {t('common.cancel')}
+                        </Button>
+                        <Button size="sm" disabled={processing} type="submit">
+                            {t('admin.create_user.add')}
+                        </Button>
                     </div>
                 </div>
             )}

@@ -255,6 +255,7 @@
             "add_role": "Add role"
         },
         "create_user": {
+            "description": "Add a new user.",
             "name_placeholder": "New user name",
             "email_placeholder": "user@example.com",
             "password_placeholder": "Min 8 characters",

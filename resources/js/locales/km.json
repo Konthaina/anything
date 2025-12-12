@@ -255,6 +255,7 @@
             "add_role": "បន្ថែមតួនាទី"
         },
         "create_user": {
+            "description": "បង្កើតអ្នកប្រើថ្មីដោយបំពេញព័ត៌មានខាងក្រោម",
             "name_placeholder": "ឈ្មោះអ្នកប្រើថ្មី",
             "email_placeholder": "user@example.com",
             "password_placeholder": "អប្បបរមា 8 តួអក្សរ",
