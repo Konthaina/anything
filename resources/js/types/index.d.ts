@@ -32,6 +32,7 @@ export interface SharedData {
     quote: { message: string; author: string };
     auth: Auth;
     sidebarOpen: boolean;
+    canManageAppearance?: boolean;
     canManageUsers?: boolean;
     canManageAll?: boolean;
     canManageRoles?: boolean;

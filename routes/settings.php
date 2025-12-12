@@ -22,7 +22,9 @@ Route::middleware('auth')->group(function () {
         ->name('user-password.update');
 
     Route::get('settings/appearance', [AppearanceController::class, 'edit'])->name('appearance.edit');
-    Route::patch('settings/appearance', [AppearanceController::class, 'update'])->name('appearance.update');
+    Route::patch('settings/appearance', [AppearanceController::class, 'update'])
+        ->middleware('can.manage-appearance')
+        ->name('appearance.update');
 
     Route::middleware('can.manage-users')->prefix('settings/admin')->name('admin.')->group(function () {
         Route::get('/', [UserManagementController::class, 'index'])->name('index');

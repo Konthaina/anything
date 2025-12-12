@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
         $permissions = [
             'manage-users' => 'Manage users',
             'manage-roles' => 'Manage roles',
-            'manage-permissions' => 'Manage permissions',
+            'manage-appearance' => 'Manage appearance',
             'manage-all' => 'Manage all',
         ];
 

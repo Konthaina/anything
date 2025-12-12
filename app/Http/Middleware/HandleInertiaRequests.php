@@ -64,6 +64,9 @@ class HandleInertiaRequests extends Middleware
                 'logo' => $site?->logo,
                 'updated_at' => optional($site?->updated_at)?->toIso8601String(),
             ],
+            'canManageAppearance' => $user
+                ? ($user->hasRole('admin') || $user->hasPermission('manage-appearance') || $user->hasPermission('manage-all'))
+                : false,
             'canManageUsers' => $user
                 ? ($user->hasRole('admin') || $user->hasPermission('manage-users') || $user->hasPermission('manage-all'))
                 : false,
