@@ -1,5 +1,14 @@
 # Anything Starter (Laravel + Inertia React)
 
+<div align="center">
+
+![Laravel](https://img.shields.io/badge/Laravel-FF2D20?logo=laravel&logoColor=white&style=for-the-badge)
+![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=20232a&style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=for-the-badge)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwindcss&logoColor=white&style=for-the-badge)
+
+</div>
+
 Laravel 12 + Inertia React + TypeScript + Tailwind/shadcn/ui with built-in English/Khmer i18n and Kantumruy Pro font.
 
 ## Prerequisites
