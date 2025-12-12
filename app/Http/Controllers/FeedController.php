@@ -14,28 +14,31 @@ class FeedController extends Controller
 {
     public function index(): Response
     {
+        $posts = Post::query()
+            ->with(['user:id,name,email,avatar_path'])
+            ->latest()
+            ->get()
+            ->map(function (Post $post) {
+                return [
+                    'id' => $post->id,
+                    'content' => $post->content,
+                    'image_url' => $post->image_url,
+                    'likes_count' => $post->likes_count,
+                    'comments_count' => $post->comments_count,
+                    'shares_count' => $post->shares_count,
+                    'created_at' => $post->created_at,
+                    'user' => [
+                        'id' => $post->user->id,
+                        'name' => $post->user->name,
+                        'email' => $post->user->email,
+                        'avatar' => $post->user->avatar,
+                    ],
+                ];
+            })
+            ->values();
+
         return Inertia::render('feed/index', [
-            'posts' => Post::query()
-                ->with(['user:id,name,email,avatar_path'])
-                ->latest()
-                ->paginate(8)
-                ->through(function (Post $post) {
-                    return [
-                        'id' => $post->id,
-                        'content' => $post->content,
-                        'image_url' => $post->image_url,
-                        'likes_count' => $post->likes_count,
-                        'comments_count' => $post->comments_count,
-                        'shares_count' => $post->shares_count,
-                        'created_at' => $post->created_at,
-                        'user' => [
-                            'id' => $post->user->id,
-                            'name' => $post->user->name,
-                            'email' => $post->user->email,
-                            'avatar' => $post->user->avatar,
-                        ],
-                    ];
-                }),
+            'posts' => $posts,
         ]);
     }
 

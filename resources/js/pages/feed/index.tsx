@@ -8,11 +8,18 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { useI18n } from '@/contexts/language-context';
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, useForm, usePage } from '@inertiajs/react';
 import {
     Globe2,
     Heart,
@@ -20,8 +27,10 @@ import {
     MessageSquare,
     MoreHorizontal,
     Share2,
+    Edit3,
+    Trash2,
 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface FeedUser {
     id: number;
@@ -41,18 +50,6 @@ interface FeedPost {
     user: FeedUser;
 }
 
-interface Paginated<T> {
-    data: T[];
-    links?: { url: string | null; label: string; active: boolean }[];
-    meta?: {
-        current_page: number;
-        last_page: number;
-        from: number | null;
-        to: number | null;
-        total: number;
-        per_page: number;
-    };
-}
 
 function safeId() {
     return (
@@ -62,7 +59,9 @@ function safeId() {
 }
 
 export default function FeedPage() {
-    const { posts, auth } = usePage<SharedData & { posts?: Paginated<FeedPost> }>().props;
+    const { posts: pagePosts, auth } = usePage<SharedData & { posts?: FeedPost[] }>().props;
+    const posts = pagePosts ?? [];
+    const authUserId = auth?.user?.id;
     const { t } = useI18n();
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('feed.title'), href: '/feed' }],
@@ -71,8 +70,7 @@ export default function FeedPage() {
     const getInitials = useInitials();
 
     const normalizedPosts = useMemo(() => {
-        const list = posts?.data ?? [];
-        return list
+        return posts
             .filter(Boolean)
             .map((post) => ({
                 id: post?.id ?? safeId(),
@@ -89,7 +87,7 @@ export default function FeedPage() {
                     avatar: null,
                 },
             }));
-    }, [posts?.data]);
+    }, [posts]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -99,7 +97,7 @@ export default function FeedPage() {
 
                 <div className="space-y-4">
                     {normalizedPosts.map((post) => (
-                        <PostCard key={post.id} post={post} getInitials={getInitials} />
+                        <PostCard key={post.id} post={post} getInitials={getInitials} authUserId={authUserId} />
                     ))}
                     {normalizedPosts.length === 0 && (
                         <Card className="border-slate-800 bg-slate-900/80 text-slate-100">
@@ -109,10 +107,6 @@ export default function FeedPage() {
                         </Card>
                     )}
                 </div>
-
-                {posts?.links && posts.links.length > 0 && (
-                    <SimplePagination links={posts.links} />
-                )}
             </div>
         </AppLayout>
     );
@@ -230,9 +224,20 @@ function CreatePostCard({
     );
 }
 
-function PostCard({ post, getInitials }: { post: FeedPost; getInitials: (value?: string | null) => string }) {
+function PostCard({
+    post,
+    getInitials,
+    authUserId,
+}: {
+    post: FeedPost;
+    getInitials: (value?: string | null) => string;
+    authUserId?: number;
+}) {
     const { t } = useI18n();
     const [showImage, setShowImage] = useState(true);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const isAuthor = authUserId !== undefined && authUserId === post.user.id;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
     const sanitizedImageUrl = useMemo(() => {
         if (!post.image_url) return null;
@@ -260,13 +265,40 @@ function PostCard({ post, getInitials }: { post: FeedPost; getInitials: (value?:
                         </div>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    aria-label="More actions"
-                >
-                    <MoreHorizontal className="h-5 w-5" />
-                </button>
+                {isAuthor && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                aria-label="More actions"
+                            >
+                                <MoreHorizontal className="h-5 w-5" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                                onSelect={(event) => {
+                                    event.preventDefault();
+                                    setIsEditOpen(true);
+                                }}
+                            >
+                                <Edit3 className="size-4" />
+                                {t('feed.edit')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={(event) => {
+                                    event.preventDefault();
+                                    setIsDeleteOpen(true);
+                                }}
+                            >
+                                <Trash2 className="size-4" />
+                                {t('feed.delete')}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-relaxed text-foreground">
                 {(post.content ?? '').split('\n').map((line, idx) => (
@@ -283,35 +315,219 @@ function PostCard({ post, getInitials }: { post: FeedPost; getInitials: (value?:
                     </div>
                 )}
             </CardContent>
-            <CardFooter className="flex flex-col gap-3 border-t border-border pt-3">
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                            👍
-                        </span>
-                        <span className="font-medium text-foreground">{post.likes_count}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                            {post.comments_count} {t('feed.comments')}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Share2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                            {post.shares_count} {t('feed.shares')}
-                        </span>
-                    </div>
-                </div>
-
+            <CardFooter className="border-t border-border pt-3">
                 <div className="grid grid-cols-3 gap-2 text-sm">
                     <ActionButton icon={Heart} label={t('feed.like')} />
                     <ActionButton icon={MessageSquare} label={t('feed.comment')} />
                     <ActionButton icon={Share2} label={t('feed.share')} />
                 </div>
             </CardFooter>
+            <EditPostDialog post={post} open={isEditOpen} onOpenChange={setIsEditOpen} />
+            <DeletePostDialog postId={post.id} open={isDeleteOpen} onOpenChange={setIsDeleteOpen} />
         </Card>
+    );
+}
+
+interface EditPostDialogProps {
+    post: FeedPost;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
+    const { t } = useI18n();
+    const form = useForm({
+        content: post.content ?? '',
+        image: null as File | null,
+        remove_image: false,
+    });
+    const { setData, clearErrors } = form;
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const previewBlobRef = useRef<string | null>(null);
+    const [preview, setPreview] = useState<string | null>(post.image_url ?? null);
+
+    useEffect(() => {
+        setData({
+            content: post.content ?? '',
+            image: null,
+            remove_image: false,
+        });
+        clearErrors();
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+        if (previewBlobRef.current) {
+            URL.revokeObjectURL(previewBlobRef.current);
+            previewBlobRef.current = null;
+        }
+        setPreview(post.image_url ?? null);
+    }, [post.id, post.content, post.image_url, open, setData, clearErrors]);
+
+    useEffect(() => {
+        return () => {
+            if (previewBlobRef.current) {
+                URL.revokeObjectURL(previewBlobRef.current);
+            }
+        };
+    }, []);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] ?? null;
+        form.setData('image', file);
+        form.setData('remove_image', false);
+        if (file) {
+            if (previewBlobRef.current) {
+                URL.revokeObjectURL(previewBlobRef.current);
+            }
+            const url = URL.createObjectURL(file);
+            previewBlobRef.current = url;
+            setPreview(url);
+        } else {
+            if (previewBlobRef.current) {
+                URL.revokeObjectURL(previewBlobRef.current);
+                previewBlobRef.current = null;
+            }
+            setPreview(post.image_url ?? null);
+        }
+    };
+
+    const handleRemoveImage = () => {
+        const next = !form.data.remove_image;
+        form.setData('remove_image', next);
+        if (next) {
+            form.setData('image', null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+            if (previewBlobRef.current) {
+                URL.revokeObjectURL(previewBlobRef.current);
+                previewBlobRef.current = null;
+            }
+            setPreview(null);
+        } else {
+            setPreview(post.image_url ?? null);
+        }
+    };
+
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        form.put(`/feed/${post.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                onOpenChange(false);
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{t('feed.edit_title')}</DialogTitle>
+                    <DialogDescription>{t('feed.edit_description')}</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-4">
+                    <div className="space-y-2 text-sm">
+                        <label htmlFor={`edit-content-${post.id}`} className="font-semibold">
+                            {t('feed.placeholder')}
+                        </label>
+                        <textarea
+                            id={`edit-content-${post.id}`}
+                            name="content"
+                            value={form.data.content}
+                            onChange={(event) => form.setData('content', event.target.value)}
+                            placeholder={t('feed.placeholder')}
+                            className="min-h-[140px] w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+                        />
+                        <InputError message={form.errors.content} />
+                    </div>
+
+                    <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <ImageIcon className="h-4 w-4" />
+                            <span>{t('feed.attach_image')}</span>
+                        </div>
+                        <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
+                            <span>{t('feed.browse')}</span>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                name="image"
+                                accept="image/*"
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                onChange={handleFileChange}
+                            />
+                        </label>
+                        <InputError message={form.errors.image} />
+                        <div className="flex items-center justify-end">
+                            <Button
+                                type="button"
+                                variant={form.data.remove_image ? 'destructive' : 'outline'}
+                                size="sm"
+                                onClick={handleRemoveImage}
+                            >
+                                {form.data.remove_image ? t('feed.clear_selection') : t('feed.remove_image')}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {preview && (
+                        <div className="overflow-hidden rounded-xl border border-border">
+                            <img
+                                src={preview}
+                                alt=""
+                                className="w-full object-cover"
+                                onError={() => setPreview(null)}
+                            />
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="ghost">{t('common.cancel')}</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={form.processing}>
+                            {t('feed.update')}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+interface DeletePostDialogProps {
+    postId: number | string;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+function DeletePostDialog({ postId, open, onOpenChange }: DeletePostDialogProps) {
+    const { t } = useI18n();
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{t('feed.delete_confirm_title')}</DialogTitle>
+                    <DialogDescription>{t('feed.delete_confirm_description')}</DialogDescription>
+                </DialogHeader>
+                <Form
+                    method="delete"
+                    action={`/feed/${postId}`}
+                    onSuccess={() => onOpenChange(false)}
+                    className="grid gap-4"
+                >
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button variant="ghost">{t('common.cancel')}</Button>
+                        </DialogClose>
+                        <Button type="submit" variant="destructive">
+                            {t('feed.delete_confirm')}
+                        </Button>
+                    </DialogFooter>
+                </Form>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -330,38 +546,6 @@ function ActionButton({
             <Icon className="h-4 w-4" />
             <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
         </button>
-    );
-}
-
-function SimplePagination({
-    links,
-}: {
-    links: { url: string | null; label: string; active: boolean }[];
-}) {
-    return (
-        <div className="flex items-center justify-center gap-2 py-4">
-            {links.map((link, idx) => {
-                const label = link.label.replace(/&laquo;|&raquo;|;/g, '');
-                return (
-                    <Link
-                        key={`${label}-${idx}`}
-                        href={link.url ?? '#'}
-                        className={[
-                            'rounded-md px-3 py-1 text-sm transition',
-                            link.active
-                                ? 'bg-primary text-primary-foreground shadow'
-                                : 'bg-muted text-foreground hover:bg-muted/70',
-                            !link.url && 'cursor-not-allowed opacity-50',
-                        ]
-                            .filter(Boolean)
-                            .join(' ')}
-                        aria-disabled={!link.url}
-                    >
-                        {label}
-                    </Link>
-                );
-            })}
-        </div>
     );
 }
 
