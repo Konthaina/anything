@@ -757,7 +757,47 @@ function Pagination({
     meta?: { current_page: number; last_page: number; from: number | null; to: number | null; total: number };
 }) {
     const { t } = useI18n();
-    if (!links || links.length === 0) return null;
+
+    const pagination = useMemo(() => {
+        if (!links || links.length === 0) return null;
+
+        const prev = links[0];
+        const next = links[links.length - 1];
+        const numberedLinks = links
+            .slice(1, -1)
+            .map((link) => ({
+                ...link,
+                page: Number.parseInt(link.label.replace(/[^0-9]/g, ''), 10),
+            }))
+            .filter((link) => Number.isFinite(link.page));
+
+        const sortedNumbered = [...numberedLinks].sort((a, b) => (a.page ?? 0) - (b.page ?? 0));
+        const derivedCurrent = sortedNumbered.find((link) => link.active)?.page ?? sortedNumbered[0]?.page ?? 1;
+        const derivedLast = sortedNumbered[sortedNumbered.length - 1]?.page ?? derivedCurrent ?? 1;
+
+        const lastPage = meta?.last_page ?? derivedLast;
+        const currentPage = meta?.current_page ?? derivedCurrent;
+
+        const desiredPages =
+            lastPage <= 4
+                ? Array.from({ length: lastPage }, (_, idx) => idx + 1)
+                : currentPage <= 3
+                  ? [1, 2, 3, lastPage]
+                  : currentPage >= lastPage - 2
+                    ? [1, lastPage - 2, lastPage - 1, lastPage]
+                    : [1, currentPage - 1, currentPage, lastPage];
+
+        const uniquePages = Array.from(new Set(desiredPages)).filter((page) => page >= 1 && page <= lastPage);
+        const pages = uniquePages
+            .map((pageNumber) => sortedNumbered.find((link) => link.page === pageNumber))
+            .filter(Boolean);
+
+        const limitedFallback = sortedNumbered.slice(0, 4);
+
+        return { prev, next, pages: pages.length ? pages : limitedFallback };
+    }, [links, meta]);
+
+    if (!pagination || pagination.pages.length === 0) return null;
 
     return (
         <div className="flex flex-col items-center gap-2 bg-background px-3 py-2 text-sm">
@@ -766,39 +806,76 @@ function Pagination({
                     {t('admin.pagination', { from: meta.from ?? 0, to: meta.to ?? 0, total: meta.total })}
                 </div>
             )}
-            {links?.length ? (
+            {pagination.pages.length ? (
                 <div className="flex items-center gap-1">
-                    {links.map((link, idx) => {
-                        const isPrev = idx === 0;
-                        const isNext = idx === links.length - 1;
-                        const label = isPrev
-                            ? t('common.previous')
-                            : isNext
-                              ? t('common.next')
-                              : link.label.replace(/&laquo;|&raquo;|;/g, '');
+                    {pagination.prev && (
+                        <PaginationLink
+                            link={pagination.prev}
+                            label={t('common.previous')}
+                            disabled={!pagination.prev.url}
+                        />
+                    )}
 
-                        const disabled = !link.url;
+                    {pagination.pages.map((pageLink, idx) => {
+                        const previousPage = pagination.pages[idx - 1]?.page;
+                        const needsEllipsis =
+                            idx > 0 &&
+                            typeof previousPage === 'number' &&
+                            typeof pageLink.page === 'number' &&
+                            pageLink.page - previousPage > 1;
 
                         return (
-                            <Link
-                                key={`${link.label}-${idx}`}
-                                href={link.url ?? '#'}
-                                className={[
-                                    'rounded-md px-3 py-1 transition',
-                                    link.active ? 'bg-foreground text-background' : 'text-foreground/80 hover:bg-muted',
-                                    disabled && 'cursor-not-allowed opacity-50',
-                                ]
-                                    .filter(Boolean)
-                                    .join(' ')}
-                                aria-disabled={disabled}
-                            >
-                                {label}
-                            </Link>
+                            <div key={`${pageLink.label}-${pageLink.page ?? idx}`} className="flex items-center gap-1">
+                                {needsEllipsis && (
+                                    <span className="px-1 text-muted-foreground" aria-hidden="true">
+                                        ...
+                                    </span>
+                                )}
+                                <PaginationLink
+                                    link={pageLink}
+                                    label={String(pageLink.page ?? pageLink.label.replace(/&laquo;|&raquo;|;/g, ''))}
+                                    disabled={!pageLink.url}
+                                />
+                            </div>
                         );
                     })}
+
+                    {pagination.next && (
+                        <PaginationLink
+                            link={pagination.next}
+                            label={t('common.next')}
+                            disabled={!pagination.next.url}
+                        />
+                    )}
                 </div>
             ) : null}
         </div>
+    );
+}
+
+function PaginationLink({
+    link,
+    label,
+    disabled,
+}: {
+    link: { url: string | null; label: string; active: boolean };
+    label: string;
+    disabled: boolean;
+}) {
+    return (
+        <Link
+            href={link.url ?? '#'}
+            className={[
+                'rounded-md px-3 py-1 transition',
+                link.active ? 'bg-foreground text-background' : 'text-foreground/80 hover:bg-muted',
+                disabled && 'cursor-not-allowed opacity-50',
+            ]
+                .filter(Boolean)
+                .join(' ')}
+            aria-disabled={disabled}
+        >
+            {label}
+        </Link>
     );
 }
 
