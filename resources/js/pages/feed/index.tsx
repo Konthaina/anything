@@ -29,6 +29,7 @@ import {
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
+import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
 import { Form, Head, useForm, usePage } from '@inertiajs/react';
 import {
@@ -276,6 +277,12 @@ function PostCard({
         return urls.filter((url) => url && !url.includes('via.placeholder.com'));
     }, [post.image_urls]);
     const visibleImageUrls = sanitizedImageUrls.filter((url) => !hiddenImages.includes(url));
+    const imageGridClass =
+        visibleImageUrls.length === 1
+            ? 'grid-cols-1'
+            : visibleImageUrls.length === 2
+                ? 'grid-cols-2'
+                : 'grid-cols-2 sm:grid-cols-3';
 
     useEffect(() => {
         setHiddenImages([]);
@@ -341,18 +348,18 @@ function PostCard({
                     <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                 ))}
                 {visibleImageUrls.length > 0 && (
-                    <div className="grid w-full gap-2 sm:grid-cols-2">
+                    <div className={`grid w-full gap-2 ${imageGridClass}`}>
                         {visibleImageUrls.map((url) => (
                             <button
                                 key={url}
                                 type="button"
                                 onClick={() => setLightboxImage(url)}
-                                className="overflow-hidden rounded-2xl border border-border transition hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-primary/60"
+                                className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
                             >
                                 <img
                                     src={url}
                                     alt=""
-                                    className="block h-full w-full object-cover"
+                                    className="h-full w-full object-cover"
                                     onError={() => {
                                         setHiddenImages((prev) =>
                                             prev.includes(url) ? prev : [...prev, url],
@@ -363,9 +370,24 @@ function PostCard({
                         ))}
                     </div>
                 )}
+                <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[0.75rem]">
+                        <span className="text-foreground font-semibold">
+                            {formatCount(post.likes_count)} {t('feed.like')}
+                        </span>
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                            <span>
+                                {formatCount(post.comments_count)} {t('feed.comments')}
+                            </span>
+                            <span>
+                                {formatCount(post.shares_count)} {t('feed.shares')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </CardContent>
-            <CardFooter className="border-t border-border pt-3">
-                <div className="grid grid-cols-3 gap-2 text-sm">
+            <CardFooter className="border-t border-border/60 px-0 py-0">
+                <div className="flex w-full divide-x divide-border/60 text-xs font-semibold uppercase text-muted-foreground">
                     <ActionButton icon={Heart} label={t('feed.like')} />
                     <ActionButton icon={MessageSquare} label={t('feed.comment')} />
                     <ActionButton icon={Share2} label={t('feed.share')} />
@@ -623,7 +645,7 @@ function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogPr
                         <img
                             src={imageUrl}
                             alt={t('feed.view_image')}
-                            className="max-h-[90vh] w-full rounded-3xl object-contain"
+                            className="max-h-[90vh] w-full object-contain"
                         />
                     </div>
                 </DialogPrimitive.Content>
@@ -635,19 +657,37 @@ function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogPr
 function ActionButton({
     icon: Icon,
     label,
+    className = '',
 }: {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
+    className?: string;
 }) {
     return (
         <button
             type="button"
-            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-foreground transition hover:border-border hover:bg-muted"
+            className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-none border-0 bg-transparent px-3 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                className,
+            )}
         >
             <Icon className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
+            <span>{label}</span>
         </button>
     );
+}
+
+function formatCount(value?: number): string {
+    const amount = Math.max(0, Math.floor(value ?? 0));
+
+    if (amount < 1000) {
+        return amount.toString();
+    }
+
+    const thousands = amount / 1000;
+    const formatted = (Math.round(thousands * 10) / 10).toFixed(1).replace(/\.0$/, '');
+
+    return `${formatted}k`;
 }
 
 function formatRelativeTime(value: string): string {
