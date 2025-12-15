@@ -6,6 +6,10 @@ use App\Events\PostLikesUpdated;
 use App\Models\Comment;
 use App\Models\Post;
 use App\Support\FeedCommentPresenter;
+use App\Support\NotificationDispatcher;
+use App\Support\NotificationPresenter;
+use App\Notifications\PostLikedNotification;
+use App\Notifications\PostUnlikedNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -73,8 +77,20 @@ class FeedController extends Controller
             })
             ->values();
 
+        $notifications = $user
+            ? $user->notifications()
+                ->latest()
+                ->limit(10)
+                ->get()
+                ->map(fn ($notification) => NotificationPresenter::present($notification))
+            : collect();
+
+        $unreadCount = $user ? $user->unreadNotifications()->count() : 0;
+
         return Inertia::render('feed/index', [
             'posts' => $posts,
+            'notifications' => $notifications,
+            'notifications_unread_count' => $unreadCount,
         ]);
     }
 
@@ -90,9 +106,19 @@ class FeedController extends Controller
             $post->forceFill([
                 'likes_count' => max(0, ($post->likes_count ?? 0) - 1),
             ])->save();
+
+            if ($post->user_id !== $user->id) {
+                $post->loadMissing('user');
+                NotificationDispatcher::send($post->user, new PostUnlikedNotification($post, $user));
+            }
         } else {
             $post->likes()->create(['user_id' => $user->id]);
             $post->increment('likes_count');
+
+            if ($post->user_id !== $user->id) {
+                $post->loadMissing('user');
+                NotificationDispatcher::send($post->user, new PostLikedNotification($post, $user));
+            }
         }
 
         $post->refresh();
@@ -205,4 +231,5 @@ class FeedController extends Controller
 
         Storage::disk('public')->delete($path);
     }
+
 }

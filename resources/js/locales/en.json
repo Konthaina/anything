@@ -304,6 +304,10 @@
         "delete_confirm": "Delete post",
         "visibility": {
             "public": "Public"
-        }
+        },
+        "notifications": "Notifications",
+        "mark_all_read": "Mark all read",
+        "no_notifications": "You're all caught up!",
+        "notifications_description": "Latest activity on your posts."
     }
 }

@@ -22,6 +22,33 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface NotificationActor {
+    id: number;
+    name: string;
+    avatar?: string | null;
+}
+
+export interface NotificationPayload {
+    actor?: NotificationActor;
+    post_id?: number | string;
+    comment_id?: number | string;
+    parent_comment_id?: number | string;
+    post_excerpt?: string;
+    comment_excerpt?: string;
+    reply_excerpt?: string;
+    parent_excerpt?: string;
+    [key: string]: unknown;
+}
+
+export interface AppNotification {
+    id: string;
+    type: string;
+    message: string;
+    data: NotificationPayload;
+    created_at?: string;
+    read_at?: string | null;
+}
+
 export interface SharedData {
     name: string;
     app?: {
@@ -36,6 +63,8 @@ export interface SharedData {
     canManageUsers?: boolean;
     canManageAll?: boolean;
     canManageRoles?: boolean;
+    notifications?: AppNotification[];
+    notifications_unread_count?: number;
     [key: string]: unknown;
 }
 

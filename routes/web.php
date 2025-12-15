@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use App\Http\Controllers\FeedController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\NotificationController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -23,6 +24,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('feed/{post}/like', [FeedController::class, 'toggleLike'])->name('feed.like');
     Route::post('feed/{post}/comments', [CommentController::class, 'store'])->name('comments.store');
     Route::delete('feed/{post}', [FeedController::class, 'destroy'])->name('feed.destroy');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 });
 
 require __DIR__.'/settings.php';

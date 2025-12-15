@@ -25,9 +25,10 @@ import AppLayout from '@/layouts/app-layout';
 import { getEchoInstance } from '@/lib/echo-client';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import { type AppNotification, type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Bell,
     Edit3,
     Globe2,
     Heart,
@@ -66,6 +67,10 @@ interface FeedComment {
     user: FeedUser;
     parent_id?: number | null;
     replies?: FeedComment[];
+}
+
+interface UserNotificationCreatedPayload {
+    notification?: AppNotification;
 }
 
 interface PostLikesUpdatedPayload {
@@ -107,10 +112,36 @@ function normalizeComment(comment?: Partial<FeedComment>): FeedComment {
 const MAX_IMAGES = 7;
 
 export default function FeedPage() {
-    const { posts: pagePosts, auth } = usePage<SharedData & { posts?: FeedPost[] }>().props;
+    const {
+        posts: pagePosts,
+        auth,
+        notifications: pageNotifications,
+        notifications_unread_count: notificationsUnreadCount,
+    } = usePage<
+        SharedData & {
+            posts?: FeedPost[];
+            notifications?: AppNotification[];
+            notifications_unread_count?: number;
+        }
+    >().props;
     const posts = useMemo(() => pagePosts ?? [], [pagePosts]);
+    const notifications = useMemo(() => pageNotifications ?? [], [pageNotifications]);
+    const unreadNotificationCount = notificationsUnreadCount ?? 0;
     const authUserId = auth?.user?.id;
     const { t } = useI18n();
+
+    const [liveNotifications, setLiveNotifications] = useState<AppNotification[]>(notifications);
+    const [liveUnreadNotifications, setLiveUnreadNotifications] = useState<number>(
+        unreadNotificationCount,
+    );
+
+    useEffect(() => {
+        setLiveNotifications(notifications);
+    }, [notifications]);
+
+    useEffect(() => {
+        setLiveUnreadNotifications(unreadNotificationCount);
+    }, [unreadNotificationCount]);
 
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('feed.title'), href: '/feed' }],
@@ -118,6 +149,60 @@ export default function FeedPage() {
     );
 
     const getInitials = useInitials();
+
+    useEffect(() => {
+        if (!authUserId) return;
+
+        const echo = getEchoInstance();
+        if (!echo) return;
+
+        const channelName = `notifications.${authUserId}`;
+        const channel =
+            typeof echo.private === 'function' ? echo.private(channelName) : echo.channel(channelName);
+
+        const handleNotification = (payload: UserNotificationCreatedPayload) => {
+            const notification = payload?.notification;
+            if (!notification) return;
+
+            setLiveNotifications((current) => {
+                const filtered = current.filter((item) => item.id !== notification.id);
+                return [notification, ...filtered].slice(0, 10);
+            });
+
+            if (!notification.read_at) {
+                setLiveUnreadNotifications((count) => count + 1);
+            }
+        };
+
+        channel.listen('.UserNotificationCreated', handleNotification);
+
+        return () => {
+            channel.stopListening('.UserNotificationCreated');
+            echo.leave(channelName);
+        };
+    }, [authUserId]);
+
+    const handleMarkAllNotificationsRead = useCallback(() => {
+        if (!liveUnreadNotifications) return;
+
+        router.post(
+            '/notifications/read-all',
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    const nowIso = new Date().toISOString();
+                    setLiveNotifications((current) =>
+                        current.map((notification) => ({
+                            ...notification,
+                            read_at: notification.read_at ?? nowIso,
+                        })),
+                    );
+                    setLiveUnreadNotifications(0);
+                },
+            },
+        );
+    }, [liveUnreadNotifications]);
 
     const normalizedPosts = useMemo(() => {
         return posts
@@ -180,6 +265,14 @@ export default function FeedPage() {
                         </Card>
                     )}
                 </div>
+
+                {auth?.user && (
+                    <NotificationFloatingButton
+                        notifications={liveNotifications}
+                        unreadCount={liveUnreadNotifications}
+                        onMarkAllRead={handleMarkAllNotificationsRead}
+                    />
+                )}
             </div>
         </AppLayout>
     );
@@ -1156,6 +1249,112 @@ function ActionButton({
         </button>
     );
 }
+
+interface NotificationFloatingButtonProps {
+    notifications: AppNotification[];
+    unreadCount: number;
+    onMarkAllRead?: () => void;
+}
+
+function NotificationFloatingButton({
+    notifications,
+    unreadCount,
+    onMarkAllRead,
+}: NotificationFloatingButtonProps) {
+    const { t } = useI18n();
+    const [open, setOpen] = useState(false);
+    const hasNotifications = notifications.length > 0;
+    const badgeCount = Math.max(0, unreadCount);
+
+    const handleMarkAllRead = () => {
+        onMarkAllRead?.();
+    };
+
+    const resolveExcerpt = (notification: AppNotification) => {
+        return (
+            notification.data.reply_excerpt ||
+            notification.data.comment_excerpt ||
+            notification.data.post_excerpt ||
+            notification.data.parent_excerpt ||
+            ''
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <Button
+                type="button"
+                variant="default"
+                size="icon"
+                className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-xl lg:bottom-8 lg:right-8"
+                onClick={() => setOpen(true)}
+                aria-label={t('feed.notifications')}
+            >
+                <Bell className="h-5 w-5" />
+                {badgeCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 inline-flex h-5 min-w-[1.1rem] items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-black leading-none text-white">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                )}
+            </Button>
+
+            <DialogContent className="max-w-md p-0">
+                <DialogHeader className="px-4 py-3">
+                    <DialogTitle className="text-lg font-semibold">{t('feed.notifications')}</DialogTitle>
+                    <DialogDescription>{t('feed.notifications_description')}</DialogDescription>
+                </DialogHeader>
+
+                <div className="max-h-[420px] divide-y divide-border/60 overflow-y-auto px-4">
+                    {hasNotifications ? (
+                        notifications.map((notification) => {
+                            const excerpt = resolveExcerpt(notification);
+                            return (
+                                <div
+                                    key={notification.id}
+                                    className={cn(
+                                        'py-3 text-sm',
+                                        !notification.read_at && 'bg-muted/30',
+                                    )}
+                                >
+                                    <p className="font-medium leading-snug text-foreground">
+                                        {notification.message}
+                                    </p>
+                                    {excerpt && (
+                                        <p className="mt-1 text-xs text-muted-foreground">“{excerpt}”</p>
+                                    )}
+                                    {notification.created_at && (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {formatRelativeTime(notification.created_at)}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                            {t('feed.no_notifications')}
+                        </p>
+                    )}
+                </div>
+
+                <DialogFooter className="flex items-center justify-between px-4 py-3">
+                    <DialogClose asChild>
+                        <Button variant="ghost">{t('common.close')}</Button>
+                    </DialogClose>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleMarkAllRead}
+                        disabled={!unreadCount || !onMarkAllRead}
+                    >
+                        {t('feed.mark_all_read')}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 function formatCount(value?: number): string {
     const amount = Math.max(0, Math.floor(value ?? 0));

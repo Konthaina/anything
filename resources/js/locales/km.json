@@ -304,6 +304,10 @@
         "delete_confirm": "លុបប្រកាស",
         "visibility": {
             "public": "សាធារណៈ"
-        }
+        },
+        "notifications": "ការជូនដំណឹង",
+        "mark_all_read": "សម្អាតការជូនដំណឹង",
+        "no_notifications": "អ្នកបានអានអស់ហើយ!",
+        "notifications_description": "សកម្មភាពចុងក្រោយលើប្រកាសរបស់អ្នក។"
     }
 }

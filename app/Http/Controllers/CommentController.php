@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Events\PostCommentCreated;
 use App\Models\Comment;
 use App\Models\Post;
+use App\Notifications\CommentRepliedNotification;
+use App\Notifications\PostCommentedNotification;
+use App\Support\NotificationDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -52,10 +55,23 @@ class CommentController extends Controller
 
         if ($comment) {
             $comment
-                ->load('user:id,name,email,avatar_path')
+                ->load('user:id,name,email,avatar_path', 'parent.user:id,name,email,avatar_path')
                 ->setRelation('replies', collect());
 
             event(new PostCommentCreated($post, $comment));
+
+            if ($post->user_id !== $user->id) {
+                $post->loadMissing('user');
+                NotificationDispatcher::send($post->user, new PostCommentedNotification($post, $comment, $user));
+            }
+
+            if ($comment->parent && $comment->parent->user_id !== $user->id) {
+                $comment->parent->loadMissing('user');
+                NotificationDispatcher::send(
+                    $comment->parent->user,
+                    new CommentRepliedNotification($comment->parent, $comment, $user),
+                );
+            }
         }
 
         return back();
