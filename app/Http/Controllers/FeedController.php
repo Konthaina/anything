@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Comment;
 use App\Models\Post;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,21 @@ class FeedController extends Controller
         $likedLookup = array_fill_keys($likedPostIds, true);
 
         $posts = Post::query()
-            ->with(['user:id,name,email,avatar_path'])
+            ->with([
+                'user:id,name,email,avatar_path',
+                'rootComments' => function ($query) {
+                    $query
+                        ->with([
+                            'user:id,name,email,avatar_path',
+                            'replies' => function ($replyQuery) {
+                                $replyQuery
+                                    ->with('user:id,name,email,avatar_path')
+                                    ->orderBy('created_at');
+                            },
+                        ])
+                        ->orderBy('created_at');
+                },
+            ])
             ->latest()
             ->get()
             ->map(function (Post $post) use ($likedLookup) {
@@ -49,6 +64,9 @@ class FeedController extends Controller
                         'avatar' => $post->user->avatar,
                     ],
                     'liked' => $likedLookup[$post->id] ?? false,
+                    'comments' => $post->rootComments
+                        ->map(fn (Comment $comment) => $this->transformComment($comment))
+                        ->values(),
                 ];
             })
             ->values();
@@ -141,6 +159,24 @@ class FeedController extends Controller
         $post->delete();
 
         return back();
+    }
+
+    private function transformComment(Comment $comment): array
+    {
+        return [
+            'id' => $comment->id,
+            'content' => $comment->content,
+            'created_at' => $comment->created_at,
+            'user' => [
+                'id' => $comment->user->id,
+                'name' => $comment->user->name,
+                'email' => $comment->user->email,
+                'avatar' => $comment->user->avatar,
+            ],
+            'replies' => $comment->replies
+                ->map(fn (Comment $reply) => $this->transformComment($reply))
+                ->values(),
+        ];
     }
 
     private function gatherUploadedFiles(array|UploadedFile|null $files): array

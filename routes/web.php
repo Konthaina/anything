@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use App\Http\Controllers\FeedController;
+use App\Http\Controllers\CommentController;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
@@ -20,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('feed', [FeedController::class, 'store'])->name('feed.store');
     Route::put('feed/{post}', [FeedController::class, 'update'])->name('feed.update');
     Route::post('feed/{post}/like', [FeedController::class, 'toggleLike'])->name('feed.like');
+    Route::post('feed/{post}/comments', [CommentController::class, 'store'])->name('comments.store');
     Route::delete('feed/{post}', [FeedController::class, 'destroy'])->name('feed.destroy');
 });
 

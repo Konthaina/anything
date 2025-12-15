@@ -47,6 +47,16 @@ class Post extends Model
         return $this->hasMany(PostLike::class);
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function rootComments(): HasMany
+    {
+        return $this->comments()->whereNull('parent_id');
+    }
+
     public function isLikedBy(?User $user): bool
     {
         if (! $user) {

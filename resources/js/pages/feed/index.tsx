@@ -1,13 +1,7 @@
 import InputError from '@/components/input-error';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
     Dialog,
@@ -28,18 +22,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type SharedData } from '@/types';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
+import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Edit3,
     Globe2,
     Heart,
     Image as ImageIcon,
     MessageSquare,
     MoreHorizontal,
     Share2,
-    Edit3,
     Trash2,
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -61,14 +55,41 @@ interface FeedPost {
     created_at: string;
     user: FeedUser;
     liked?: boolean;
+    comments?: FeedComment[];
 }
 
+interface FeedComment {
+    id: number | string;
+    content: string;
+    created_at: string;
+    user: FeedUser;
+    parent_id?: number | null;
+    replies?: FeedComment[];
+}
 
 function safeId() {
     return (
-        (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' && crypto.randomUUID()) ||
+        (typeof crypto !== 'undefined' &&
+            typeof crypto.randomUUID === 'function' &&
+            crypto.randomUUID()) ||
         `${Date.now()}-${Math.random().toString(16).slice(2)}`
     );
+}
+
+function normalizeComment(comment?: Partial<FeedComment>): FeedComment {
+    return {
+        id: comment?.id ?? safeId(),
+        content: comment?.content ?? '',
+        created_at: comment?.created_at ?? new Date().toISOString(),
+        user: comment?.user ?? {
+            id: 0,
+            name: 'Unknown',
+            email: '',
+            avatar: null,
+        },
+        parent_id: comment?.parent_id ?? null,
+        replies: (comment?.replies ?? []).map((reply) => normalizeComment(reply)),
+    };
 }
 
 const MAX_IMAGES = 7;
@@ -78,10 +99,12 @@ export default function FeedPage() {
     const posts = useMemo(() => pagePosts ?? [], [pagePosts]);
     const authUserId = auth?.user?.id;
     const { t } = useI18n();
+
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('feed.title'), href: '/feed' }],
         [t],
     );
+
     const getInitials = useInitials();
 
     const normalizedPosts = useMemo(() => {
@@ -102,14 +125,18 @@ export default function FeedPage() {
                     avatar: null,
                 },
                 liked: Boolean(post?.liked),
+                comments: (post?.comments ?? []).map((comment) => normalizeComment(comment)),
             }));
     }, [posts]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('feed.title')} />
+
             <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 pb-10">
-                {auth?.user && <CreatePostCard currentUser={auth.user as FeedUser} getInitials={getInitials} />}
+                {auth?.user && (
+                    <CreatePostCard currentUser={auth.user as FeedUser} getInitials={getInitials} />
+                )}
 
                 <div className="space-y-4">
                     {normalizedPosts.map((post) => {
@@ -123,6 +150,7 @@ export default function FeedPage() {
                             />
                         );
                     })}
+
                     {normalizedPosts.length === 0 && (
                         <Card className="border-slate-800 bg-slate-900/80 text-slate-100">
                             <CardContent className="py-10 text-center text-sm text-slate-400">
@@ -156,6 +184,7 @@ function CreatePostCard({
 
     useEffect(() => {
         return () => cleanupPreviews();
+         
     }, []);
 
     return (
@@ -167,8 +196,11 @@ function CreatePostCard({
                         {getInitials(currentUser.name)}
                     </AvatarFallback>
                 </Avatar>
-                <CardTitle className="text-base font-semibold leading-tight">{t('feed.create_title')}</CardTitle>
+                <CardTitle className="text-base font-semibold leading-tight">
+                    {t('feed.create_title')}
+                </CardTitle>
             </CardHeader>
+
             <Form
                 method="post"
                 action="/feed"
@@ -182,10 +214,11 @@ function CreatePostCard({
                     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
                         const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
                         setData?.('images', files);
+
                         cleanupPreviews();
-                        if (files.length === 0) {
-                            return;
-                        }
+
+                        if (files.length === 0) return;
+
                         const urls = files.map((file) => URL.createObjectURL(file));
                         previewUrlsRef.current = urls;
                         setPreviews(urls);
@@ -224,6 +257,7 @@ function CreatePostCard({
                                         />
                                     </label>
                                 </div>
+
                                 <InputError message={errors.images} />
 
                                 {previews.length > 0 && (
@@ -236,6 +270,7 @@ function CreatePostCard({
                                     </div>
                                 )}
                             </CardContent>
+
                             <CardFooter className="flex items-center justify-end gap-3 pt-4">
                                 <Button
                                     type="button"
@@ -251,10 +286,8 @@ function CreatePostCard({
                                 >
                                     {t('feed.clear')}
                                 </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={processing}
-                                >
+
+                                <Button type="submit" disabled={processing}>
                                     {t('feed.post')}
                                 </Button>
                             </CardFooter>
@@ -276,60 +309,75 @@ function PostCard({
     authUserId?: number;
 }) {
     const { t } = useI18n();
-    const [liked, setLiked] = useState<boolean>(Boolean(post.liked));
-    const [likesCount, setLikesCount] = useState<number>(post.likes_count ?? 0);
+
     const [likeProcessing, setLikeProcessing] = useState(false);
+    const [commentsOpen, setCommentsOpen] = useState(false);
     const [hiddenImages, setHiddenImages] = useState<string[]>([]);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+    // ✅ optimistic like (no syncing effect)
+    const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
+    const [optimisticLikesCount, setOptimisticLikesCount] = useState<number | null>(null);
+
+    const liked = optimisticLiked ?? Boolean(post.liked);
+    const likesCount = optimisticLikesCount ?? (post.likes_count ?? 0);
+
+    const comments = post.comments ?? [];
+    const commentsCount = post.comments_count ?? 0;
+
     const isAuthor = authUserId !== undefined && authUserId === post.user.id;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
+
     const sanitizedImageUrls = useMemo(() => {
         const urls = post.image_urls ?? [];
         return urls.filter((url) => url && !url.includes('via.placeholder.com'));
     }, [post.image_urls]);
+
     const visibleImageUrls = sanitizedImageUrls.filter((url) => !hiddenImages.includes(url));
     const imageGridClass =
         visibleImageUrls.length === 1
             ? 'grid-cols-1'
-                : visibleImageUrls.length === 2
-                    ? 'grid-cols-2'
-                    : 'grid-cols-2 sm:grid-cols-3';
-
-    useEffect(() => {
-        setLiked(Boolean(post.liked));
-        setLikesCount(post.likes_count ?? 0);
-    }, [post.id, post.liked, post.likes_count]);
+            : visibleImageUrls.length === 2
+                ? 'grid-cols-2'
+                : 'grid-cols-2 sm:grid-cols-3';
 
     const handleLikeToggle = () => {
         if (likeProcessing) return;
 
-        const previousLiked = liked;
-        const previousCount = likesCount;
-        const nextLiked = !previousLiked;
+        const prevLiked = liked;
+        const prevCount = likesCount;
+
+        const nextLiked = !prevLiked;
+        const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
 
         setLikeProcessing(true);
-        setLiked(nextLiked);
-        setLikesCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
+        setOptimisticLiked(nextLiked);
+        setOptimisticLikesCount(nextCount);
 
-        router.post(`/feed/${post.id}/like`, {}, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const updatedPosts = (page.props as { posts?: FeedPost[] } | undefined)?.posts;
-                const updatedPost = updatedPosts?.find((item) => item.id === post.id);
+        router.post(
+            `/feed/${post.id}/like`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const updatedPosts = (page.props as { posts?: FeedPost[] } | undefined)?.posts;
+                    const updatedPost = updatedPosts?.find((item) => item.id === post.id);
 
-                if (updatedPost) {
-                    setLiked(Boolean(updatedPost.liked));
-                    setLikesCount(Math.max(0, updatedPost.likes_count ?? 0));
-                }
+                    // if server gave updated props, drop optimism
+                    if (updatedPost) {
+                        setOptimisticLiked(null);
+                        setOptimisticLikesCount(null);
+                    }
+                },
+                onError: () => {
+                    setOptimisticLiked(null);
+                    setOptimisticLikesCount(null);
+                },
+                onFinish: () => setLikeProcessing(false),
             },
-            onError: () => {
-                setLiked(previousLiked);
-                setLikesCount(previousCount);
-            },
-            onFinish: () => setLikeProcessing(false),
-        });
+        );
     };
 
     return (
@@ -342,6 +390,7 @@ function PostCard({
                             {getInitials(post.user.name)}
                         </AvatarFallback>
                     </Avatar>
+
                     <div className="flex flex-col">
                         <div className="text-sm font-semibold leading-tight">{post.user.name}</div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -352,6 +401,7 @@ function PostCard({
                         </div>
                     </div>
                 </div>
+
                 {isAuthor && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -363,6 +413,7 @@ function PostCard({
                                 <MoreHorizontal className="h-5 w-5" />
                             </button>
                         </DropdownMenuTrigger>
+
                         <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuItem
                                 onSelect={(event) => {
@@ -373,6 +424,7 @@ function PostCard({
                                 <Edit3 className="size-4" />
                                 {t('feed.edit')}
                             </DropdownMenuItem>
+
                             <DropdownMenuItem
                                 variant="destructive"
                                 onSelect={(event) => {
@@ -387,10 +439,12 @@ function PostCard({
                     </DropdownMenu>
                 )}
             </CardHeader>
+
             <CardContent className="space-y-3 text-sm leading-relaxed text-foreground">
                 {(post.content ?? '').split('\n').map((line, idx) => (
                     <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                 ))}
+
                 {visibleImageUrls.length > 0 && (
                     <div className={`grid w-full gap-2 ${imageGridClass}`}>
                         {visibleImageUrls.map((url) => (
@@ -414,14 +468,16 @@ function PostCard({
                         ))}
                     </div>
                 )}
+
                 <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[0.75rem]">
-                        <span className="text-foreground font-semibold">
+                        <span className="font-semibold text-foreground">
                             {formatCount(likesCount)} {t('feed.like')}
                         </span>
+
                         <div className="flex items-center gap-3 text-muted-foreground">
                             <span>
-                                {formatCount(post.comments_count)} {t('feed.comments')}
+                                {formatCount(commentsCount)} {t('feed.comments')}
                             </span>
                             <span>
                                 {formatCount(post.shares_count)} {t('feed.shares')}
@@ -430,6 +486,7 @@ function PostCard({
                     </div>
                 </div>
             </CardContent>
+
             <CardFooter className="border-t border-border/60 px-0 py-0">
                 <div className="flex w-full divide-x divide-border/60 text-xs font-semibold uppercase text-muted-foreground">
                     <ActionButton
@@ -439,10 +496,25 @@ function PostCard({
                         active={liked}
                         disabled={likeProcessing}
                     />
-                    <ActionButton icon={MessageSquare} label={t('feed.comment')} />
+                    <ActionButton
+                        icon={MessageSquare}
+                        label={t('feed.comment')}
+                        onClick={() => setCommentsOpen((prev) => !prev)}
+                        active={commentsOpen}
+                    />
                     <ActionButton icon={Share2} label={t('feed.share')} />
                 </div>
             </CardFooter>
+
+            {commentsOpen && (
+                <CommentSection
+                    postId={post.id}
+                    comments={comments}
+                    getInitials={getInitials}
+                    onSubmitted={() => setCommentsOpen(true)}
+                />
+            )}
+
             <EditPostDialog
                 key={`edit-dialog-${post.id}-${isEditOpen ? 'open' : 'closed'}`}
                 post={post}
@@ -450,13 +522,12 @@ function PostCard({
                 onOpenChange={setIsEditOpen}
             />
             <DeletePostDialog postId={post.id} open={isDeleteOpen} onOpenChange={setIsDeleteOpen} />
+
             <ImageViewerDialog
                 imageUrl={lightboxImage}
                 open={Boolean(lightboxImage)}
                 onOpenChange={(open) => {
-                    if (!open) {
-                        setLightboxImage(null);
-                    }
+                    if (!open) setLightboxImage(null);
                 }}
             />
         </Card>
@@ -471,72 +542,93 @@ interface EditPostDialogProps {
 
 function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { t } = useI18n();
+
     const form = useForm({
         content: post.content ?? '',
         images: [] as File[],
         remove_image: false,
     });
+
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const previewBlobRef = useRef<string[]>([]);
-    const [previewBlobUrls, setPreviewBlobUrls] = useState<string[]>([]);
-    const [hiddenPreviewUrls, setHiddenPreviewUrls] = useState<string[]>([]);
 
+    // ✅ refs for previews (no setState in useEffect)
+    const previewBlobRef = useRef<string[]>([]);
+    const hiddenPreviewRef = useRef<Set<string>>(new Set());
+    const [, rerender] = useState(0);
+    const bump = () => rerender((v) => v + 1);
+
+    const cleanupBlobUrls = () => {
+        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+        previewBlobRef.current = [];
+    };
+
+    // ✅ keep this effect only for cleaning external resources (blob urls) + resetting input
+    // ✅ NO setState here
     useEffect(() => {
+        // reset form fields when switching post or opening dialog
         setData({
             content: post.content ?? '',
             images: [],
             remove_image: false,
         });
         clearErrors();
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
-        previewBlobRef.current = [];
-    }, [post.id, post.content, post.image_urls, open, setData, clearErrors]);
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        cleanupBlobUrls();
+        hiddenPreviewRef.current = new Set();
+
+        // NOTE: do not bump here (lint rule)
+        // re-render will happen anyway when open/post.id changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [post.id, open]);
 
     useEffect(() => {
         return () => {
-            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
+            cleanupBlobUrls();
         };
+         
     }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
+
         setData('images', files);
         setData('remove_image', false);
-        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
-        previewBlobRef.current = [];
-        setHiddenPreviewUrls([]);
-        setPreviewBlobUrls([]);
+
+        cleanupBlobUrls();
+        hiddenPreviewRef.current = new Set();
+
         if (files.length === 0) {
+            bump();
             return;
         }
+
         const urls = files.map((file) => URL.createObjectURL(file));
         previewBlobRef.current = urls;
-        setPreviewBlobUrls(urls);
+        bump();
     };
 
     const handleRemoveImage = () => {
         const next = !form.data.remove_image;
         setData('remove_image', next);
-        setPreviewBlobUrls([]);
+
         if (next) {
             setData('images', []);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-            previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
-            previewBlobRef.current = [];
-            setHiddenPreviewUrls([]);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            cleanupBlobUrls();
+            hiddenPreviewRef.current = new Set();
         } else {
-            setHiddenPreviewUrls([]);
+            hiddenPreviewRef.current = new Set();
         }
+
+        bump();
     };
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
         form.put(`/feed/${post.id}`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -547,10 +639,11 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
 
     const previewSources = form.data.remove_image
         ? []
-        : previewBlobUrls.length > 0
-            ? previewBlobUrls
+        : previewBlobRef.current.length > 0
+            ? previewBlobRef.current
             : post.image_urls ?? [];
-    const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewUrls.includes(url));
+
+    const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewRef.current.has(url));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -559,11 +652,13 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                     <DialogTitle>{t('feed.edit_title')}</DialogTitle>
                     <DialogDescription>{t('feed.edit_description')}</DialogDescription>
                 </DialogHeader>
+
                 <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-4">
                     <div className="space-y-2 text-sm">
                         <label htmlFor={`edit-content-${post.id}`} className="font-semibold">
                             {t('feed.placeholder')}
                         </label>
+
                         <textarea
                             id={`edit-content-${post.id}`}
                             name="content"
@@ -572,6 +667,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                             placeholder={t('feed.placeholder')}
                             className="min-h-[140px] w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
                         />
+
                         <InputError message={form.errors.content} />
                     </div>
 
@@ -580,6 +676,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                             <ImageIcon className="h-4 w-4" />
                             <span>{t('feed.attach_image')}</span>
                         </div>
+
                         <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
                             <span>{t('feed.browse')}</span>
                             <input
@@ -592,7 +689,9 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                                 onChange={handleFileChange}
                             />
                         </label>
+
                         <InputError message={form.errors.images} />
+
                         <div className="flex items-center justify-end">
                             <Button
                                 type="button"
@@ -614,9 +713,10 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                                         alt=""
                                         className="w-full object-cover"
                                         onError={() => {
-                                            setHiddenPreviewUrls((prev) =>
-                                                prev.includes(url) ? prev : [...prev, url],
-                                            );
+                                            if (!hiddenPreviewRef.current.has(url)) {
+                                                hiddenPreviewRef.current.add(url);
+                                                bump();
+                                            }
                                         }}
                                     />
                                 </div>
@@ -646,6 +746,7 @@ interface DeletePostDialogProps {
 
 function DeletePostDialog({ postId, open, onOpenChange }: DeletePostDialogProps) {
     const { t } = useI18n();
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -653,6 +754,7 @@ function DeletePostDialog({ postId, open, onOpenChange }: DeletePostDialogProps)
                     <DialogTitle>{t('feed.delete_confirm_title')}</DialogTitle>
                     <DialogDescription>{t('feed.delete_confirm_description')}</DialogDescription>
                 </DialogHeader>
+
                 <Form
                     method="delete"
                     action={`/feed/${postId}`}
@@ -673,6 +775,231 @@ function DeletePostDialog({ postId, open, onOpenChange }: DeletePostDialogProps)
     );
 }
 
+interface CommentSectionProps {
+    postId: number | string;
+    comments: FeedComment[];
+    getInitials: (value?: string | null) => string;
+    onSubmitted?: () => void;
+}
+
+function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentSectionProps) {
+    const { t } = useI18n();
+
+    // ✅ newest comment on top
+    const sortedComments = useMemo(() => {
+        return [...(comments ?? [])].sort((a, b) => {
+            const at = new Date(a.created_at ?? 0).getTime();
+            const bt = new Date(b.created_at ?? 0).getTime();
+            return bt - at;
+        });
+    }, [comments]);
+
+    const hasComments = sortedComments.length > 0;
+
+    return (
+        <div className="border-t border-border/60 bg-muted/30 px-4 py-4">
+            <CommentForm
+                postId={postId}
+                placeholder={t('feed.comment_placeholder')}
+                submitLabel={t('feed.post_comment')}
+                onSubmitted={() => onSubmitted?.()}
+            />
+
+            <div className="mt-4 space-y-4">
+                {hasComments ? (
+                    sortedComments.map((comment) => (
+                        <CommentItem
+                            key={comment.id}
+                            comment={comment}
+                            postId={postId}
+                            getInitials={getInitials}
+                        />
+                    ))
+                ) : (
+                    <p className="text-xs text-muted-foreground">{t('feed.no_comments')}</p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+interface CommentItemProps {
+    comment: FeedComment;
+    postId: number | string;
+    getInitials: (value?: string | null) => string;
+}
+
+function CommentItem({ comment, postId, getInitials }: CommentItemProps) {
+    const { t } = useI18n();
+    const [replyOpen, setReplyOpen] = useState(false);
+
+    // ✅ newest reply on top
+    const replies = useMemo(() => {
+        return [...(comment.replies ?? [])].sort((a, b) => {
+            const at = new Date(a.created_at ?? 0).getTime();
+            const bt = new Date(b.created_at ?? 0).getTime();
+            return bt - at;
+        });
+    }, [comment.replies]);
+
+    return (
+        <div className="flex items-start gap-3">
+            <Avatar className="h-9 w-9">
+                <AvatarImage src={comment.user.avatar ?? undefined} alt={comment.user.name} />
+                <AvatarFallback className="bg-muted text-foreground">{getInitials(comment.user.name)}</AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1 space-y-3">
+                <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2 shadow-sm">
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <div className="text-sm font-semibold leading-tight">{comment.user.name}</div>
+                            <div className="text-[11px] text-muted-foreground">
+                                {formatRelativeTime(comment.created_at)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                        {comment.content}
+                    </p>
+
+                    <div className="mt-2 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <button
+                            type="button"
+                            className="transition hover:text-primary"
+                            onClick={() => setReplyOpen((prev) => !prev)}
+                        >
+                            {t('feed.reply')}
+                        </button>
+                    </div>
+                </div>
+
+                {replyOpen && (
+                    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                        <CommentForm
+                            postId={postId}
+                            parentId={Number(comment.id)}
+                            placeholder={t('feed.reply_placeholder')}
+                            submitLabel={t('feed.post_reply')}
+                            onSubmitted={() => setReplyOpen(false)}
+                            onCancel={() => setReplyOpen(false)}
+                            compact
+                        />
+                    </div>
+                )}
+
+                {replies.length > 0 && (
+                    <div className="space-y-3 border-l border-border/60 pl-4">
+                        {replies.map((reply) => (
+                            <ReplyItem key={reply.id} reply={reply} getInitials={getInitials} />
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ReplyItem({
+    reply,
+    getInitials,
+}: {
+    reply: FeedComment;
+    getInitials: (value?: string | null) => string;
+}) {
+    return (
+        <div className="flex items-start gap-3">
+            <Avatar className="h-8 w-8">
+                <AvatarImage src={reply.user.avatar ?? undefined} alt={reply.user.name} />
+                <AvatarFallback className="bg-muted text-foreground">
+                    {getInitials(reply.user.name)}
+                </AvatarFallback>
+            </Avatar>
+
+            <div className="flex-1 rounded-2xl border border-border/60 bg-background/60 px-3 py-2 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold leading-tight">{reply.user.name}</div>
+                    <div className="text-[11px] text-muted-foreground">{formatRelativeTime(reply.created_at)}</div>
+                </div>
+                <p className="mt-1 whitespace-pre-line text-sm text-foreground">{reply.content}</p>
+            </div>
+        </div>
+    );
+}
+
+interface CommentFormProps {
+    postId: number | string;
+    parentId?: number | null;
+    placeholder: string;
+    submitLabel: string;
+    onSubmitted?: () => void;
+    onCancel?: () => void;
+    compact?: boolean;
+}
+
+function CommentForm({
+    postId,
+    parentId = null,
+    placeholder,
+    submitLabel,
+    onSubmitted,
+    onCancel,
+    compact = false,
+}: CommentFormProps) {
+    const { t } = useI18n();
+
+    const form = useForm({
+        content: '',
+        parent_id: parentId ?? null,
+    });
+
+    // ✅ remove effect that sets data (avoids lint). Just initialize from prop.
+    // If parentId changes (switch reply target), we can set it via memo key on CommentForm usage if needed.
+    // For safety: set it only when submitting.
+    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        form.setData('parent_id', parentId ?? null);
+
+        form.post(`/feed/${postId}/comments`, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                form.reset('content');
+                form.clearErrors();
+                onSubmitted?.();
+            },
+        });
+    };
+
+    const disabled = form.processing || !form.data.content.trim();
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-2">
+            <textarea
+                value={form.data.content}
+                onChange={(event) => form.setData('content', event.target.value)}
+                placeholder={placeholder}
+                rows={compact ? 2 : 3}
+                className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+            />
+            <InputError message={form.errors.content} />
+
+            <div className="flex items-center justify-end gap-2">
+                {onCancel && (
+                    <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={form.processing}>
+                        {t('common.cancel')}
+                    </Button>
+                )}
+                <Button type="submit" size="sm" disabled={disabled}>
+                    {submitLabel}
+                </Button>
+            </div>
+        </form>
+    );
+}
+
 interface ImageViewerDialogProps {
     imageUrl: string | null;
     open: boolean;
@@ -682,17 +1009,13 @@ interface ImageViewerDialogProps {
 function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogProps) {
     const { t } = useI18n();
 
-    if (!imageUrl) {
-        return null;
-    }
+    if (!imageUrl) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
                 <DialogOverlay className="bg-black/80" />
-                <DialogPrimitive.Content
-                    className="fixed inset-x-4 top-[50%] z-50 max-h-[90vh] w-auto translate-y-[-50%] transform rounded-3xl bg-transparent p-0 shadow-none"
-                >
+                <DialogPrimitive.Content className="fixed inset-x-4 top-[50%] z-50 max-h-[90vh] w-auto translate-y-[-50%] transform rounded-3xl bg-transparent p-0 shadow-none">
                     <DialogPrimitive.Title className="sr-only">{t('feed.view_image')}</DialogPrimitive.Title>
                     <DialogPrimitive.Description className="sr-only">
                         {t('feed.view_image_description')}
@@ -734,15 +1057,11 @@ function ActionButton({
             className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-none border-0 bg-transparent px-3 py-3 text-xs uppercase tracking-wide transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                 active ? 'text-primary font-bold' : 'text-muted-foreground font-semibold',
-                disabled && 'opacity-60 cursor-not-allowed',
+                disabled && 'cursor-not-allowed opacity-60',
                 className,
             )}
         >
-            <Icon
-                className="h-4 w-4"
-                strokeWidth={1.75}
-                fill={active ? 'currentColor' : 'none'}
-            />
+            <Icon className="h-4 w-4" strokeWidth={1.75} fill={active ? 'currentColor' : 'none'} />
             <span>{label}</span>
         </button>
     );
@@ -750,14 +1069,10 @@ function ActionButton({
 
 function formatCount(value?: number): string {
     const amount = Math.max(0, Math.floor(value ?? 0));
-
-    if (amount < 1000) {
-        return amount.toString();
-    }
+    if (amount < 1000) return amount.toString();
 
     const thousands = amount / 1000;
     const formatted = (Math.round(thousands * 10) / 10).toFixed(1).replace(/\.0$/, '');
-
     return `${formatted}k`;
 }
 
@@ -780,6 +1095,9 @@ function formatRelativeTime(value: string): string {
 const URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
 
 function renderLineWithLinks(line: string, index: number): React.ReactNode[] | React.ReactNode {
+    // ✅ reset because /g regex keeps internal cursor between calls
+    URL_REGEX.lastIndex = 0;
+
     const fragments: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -787,9 +1105,9 @@ function renderLineWithLinks(line: string, index: number): React.ReactNode[] | R
     while ((match = URL_REGEX.exec(line))) {
         const url = match[0];
         const start = match.index;
-        if (start > lastIndex) {
-            fragments.push(line.slice(lastIndex, start));
-        }
+
+        if (start > lastIndex) fragments.push(line.slice(lastIndex, start));
+
         fragments.push(
             <a
                 key={`link-${index}-${start}`}
@@ -801,12 +1119,11 @@ function renderLineWithLinks(line: string, index: number): React.ReactNode[] | R
                 {url}
             </a>,
         );
+
         lastIndex = start + url.length;
     }
 
-    if (lastIndex < line.length) {
-        fragments.push(line.slice(lastIndex));
-    }
+    if (lastIndex < line.length) fragments.push(line.slice(lastIndex));
 
     return fragments.length === 0 ? line : fragments;
 }
