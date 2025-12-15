@@ -153,9 +153,18 @@ export default function FeedPage() {
                 <div className="space-y-4">
                     {normalizedPosts.map((post) => {
                         const imageSignature = (post.image_urls ?? []).join('|');
+                        const commentsSignature = (post.comments ?? [])
+                            .map((comment) => comment.id)
+                            .join('|');
+                        const postSignature = [
+                            post.id,
+                            post.likes_count ?? 0,
+                            post.comments_count ?? 0,
+                            commentsSignature,
+                        ].join('|');
                         return (
                             <PostCard
-                                key={`${post.id}-${imageSignature}`}
+                                key={`${postSignature}-${imageSignature}`}
                                 post={post}
                                 getInitials={getInitials}
                                 authUserId={authUserId}
@@ -335,18 +344,6 @@ function PostCard({
     const [liveLikesCount, setLiveLikesCount] = useState(post.likes_count ?? 0);
     const [liveCommentsCount, setLiveCommentsCount] = useState(post.comments_count ?? 0);
     const [liveComments, setLiveComments] = useState<FeedComment[]>(post.comments ?? []);
-
-    useEffect(() => {
-        setLiveLikesCount(post.likes_count ?? 0);
-    }, [post.likes_count]);
-
-    useEffect(() => {
-        setLiveCommentsCount(post.comments_count ?? 0);
-    }, [post.comments_count]);
-
-    useEffect(() => {
-        setLiveComments(post.comments ?? []);
-    }, [post.comments]);
 
     const liked = optimisticLiked ?? Boolean(post.liked);
     const likesCount = optimisticLikesCount ?? liveLikesCount;
