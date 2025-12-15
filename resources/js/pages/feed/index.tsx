@@ -428,12 +428,12 @@ function PostCard({
             mergeIncomingComment(payload.comment);
         };
 
-        channel.listen('PostLikesUpdated', handleLikes);
-        channel.listen('PostCommentCreated', handleComments);
+        channel.listen('.PostLikesUpdated', handleLikes);
+        channel.listen('.PostCommentCreated', handleComments);
 
         return () => {
-            channel.stopListening('PostLikesUpdated');
-            channel.stopListening('PostCommentCreated');
+            channel.stopListening('.PostLikesUpdated');
+            channel.stopListening('.PostCommentCreated');
             echo.leaveChannel(channelName);
         };
     }, [post.id, mergeIncomingComment, idsMatch]);
