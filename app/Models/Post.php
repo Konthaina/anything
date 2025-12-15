@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -39,6 +40,24 @@ class Post extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(PostLike::class);
+    }
+
+    public function isLikedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->relationLoaded('likes')) {
+            return $this->likes->contains('user_id', $user->id);
+        }
+
+        return $this->likes()->where('user_id', $user->id)->exists();
     }
 
     public function getImagePathsAttribute($value): array

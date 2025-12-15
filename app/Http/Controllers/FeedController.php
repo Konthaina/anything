@@ -6,6 +6,7 @@ use App\Models\Post;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -15,13 +16,24 @@ class FeedController extends Controller
 {
     private const MAX_IMAGES = 7;
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $user = $request->user();
+
+        $likedPostIds = $user
+            ? DB::table('post_likes')
+                ->where('user_id', $user->id)
+                ->pluck('post_id')
+                ->all()
+            : [];
+
+        $likedLookup = array_fill_keys($likedPostIds, true);
+
         $posts = Post::query()
             ->with(['user:id,name,email,avatar_path'])
             ->latest()
             ->get()
-            ->map(function (Post $post) {
+            ->map(function (Post $post) use ($likedLookup) {
                 return [
                     'id' => $post->id,
                     'content' => $post->content,
@@ -36,6 +48,7 @@ class FeedController extends Controller
                         'email' => $post->user->email,
                         'avatar' => $post->user->avatar,
                     ],
+                    'liked' => $likedLookup[$post->id] ?? false,
                 ];
             })
             ->values();
@@ -43,6 +56,26 @@ class FeedController extends Controller
         return Inertia::render('feed/index', [
             'posts' => $posts,
         ]);
+    }
+
+    public function toggleLike(Request $request, Post $post): RedirectResponse
+    {
+        $user = $request->user();
+
+        $existing = $post->likes()->where('user_id', $user->id);
+        $wasLiked = $existing->exists();
+
+        if ($wasLiked) {
+            $existing->delete();
+            $post->forceFill([
+                'likes_count' => max(0, ($post->likes_count ?? 0) - 1),
+            ])->save();
+        } else {
+            $post->likes()->create(['user_id' => $user->id]);
+            $post->increment('likes_count');
+        }
+
+        return back();
     }
 
     public function store(Request $request): RedirectResponse

@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('feed', [FeedController::class, 'index'])->name('feed.index');
     Route::post('feed', [FeedController::class, 'store'])->name('feed.store');
     Route::put('feed/{post}', [FeedController::class, 'update'])->name('feed.update');
+    Route::post('feed/{post}/like', [FeedController::class, 'toggleLike'])->name('feed.like');
     Route::delete('feed/{post}', [FeedController::class, 'destroy'])->name('feed.destroy');
 });
 

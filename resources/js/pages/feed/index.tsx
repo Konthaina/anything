@@ -31,7 +31,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
-import { Form, Head, useForm, usePage } from '@inertiajs/react';
+import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Globe2,
     Heart,
@@ -60,6 +60,7 @@ interface FeedPost {
     shares_count: number;
     created_at: string;
     user: FeedUser;
+    liked?: boolean;
 }
 
 
@@ -100,6 +101,7 @@ export default function FeedPage() {
                     email: '',
                     avatar: null,
                 },
+                liked: Boolean(post?.liked),
             }));
     }, [posts]);
 
@@ -274,6 +276,9 @@ function PostCard({
     authUserId?: number;
 }) {
     const { t } = useI18n();
+    const [liked, setLiked] = useState<boolean>(Boolean(post.liked));
+    const [likesCount, setLikesCount] = useState<number>(post.likes_count ?? 0);
+    const [likeProcessing, setLikeProcessing] = useState(false);
     const [hiddenImages, setHiddenImages] = useState<string[]>([]);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -288,9 +293,44 @@ function PostCard({
     const imageGridClass =
         visibleImageUrls.length === 1
             ? 'grid-cols-1'
-            : visibleImageUrls.length === 2
-                ? 'grid-cols-2'
-                : 'grid-cols-2 sm:grid-cols-3';
+                : visibleImageUrls.length === 2
+                    ? 'grid-cols-2'
+                    : 'grid-cols-2 sm:grid-cols-3';
+
+    useEffect(() => {
+        setLiked(Boolean(post.liked));
+        setLikesCount(post.likes_count ?? 0);
+    }, [post.id, post.liked, post.likes_count]);
+
+    const handleLikeToggle = () => {
+        if (likeProcessing) return;
+
+        const previousLiked = liked;
+        const previousCount = likesCount;
+        const nextLiked = !previousLiked;
+
+        setLikeProcessing(true);
+        setLiked(nextLiked);
+        setLikesCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
+
+        router.post(`/feed/${post.id}/like`, {}, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const updatedPosts = (page.props as { posts?: FeedPost[] } | undefined)?.posts;
+                const updatedPost = updatedPosts?.find((item) => item.id === post.id);
+
+                if (updatedPost) {
+                    setLiked(Boolean(updatedPost.liked));
+                    setLikesCount(Math.max(0, updatedPost.likes_count ?? 0));
+                }
+            },
+            onError: () => {
+                setLiked(previousLiked);
+                setLikesCount(previousCount);
+            },
+            onFinish: () => setLikeProcessing(false),
+        });
+    };
 
     return (
         <Card className="overflow-hidden border-border bg-card text-foreground shadow-2xl">
@@ -377,7 +417,7 @@ function PostCard({
                 <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[0.75rem]">
                         <span className="text-foreground font-semibold">
-                            {formatCount(post.likes_count)} {t('feed.like')}
+                            {formatCount(likesCount)} {t('feed.like')}
                         </span>
                         <div className="flex items-center gap-3 text-muted-foreground">
                             <span>
@@ -392,7 +432,13 @@ function PostCard({
             </CardContent>
             <CardFooter className="border-t border-border/60 px-0 py-0">
                 <div className="flex w-full divide-x divide-border/60 text-xs font-semibold uppercase text-muted-foreground">
-                    <ActionButton icon={Heart} label={t('feed.like')} />
+                    <ActionButton
+                        icon={Heart}
+                        label={t('feed.like')}
+                        onClick={handleLikeToggle}
+                        active={liked}
+                        disabled={likeProcessing}
+                    />
                     <ActionButton icon={MessageSquare} label={t('feed.comment')} />
                     <ActionButton icon={Share2} label={t('feed.share')} />
                 </div>
@@ -668,20 +714,35 @@ function ActionButton({
     icon: Icon,
     label,
     className = '',
+    onClick,
+    active = false,
+    disabled = false,
 }: {
-    icon: React.ComponentType<{ className?: string }>;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     label: string;
     className?: string;
+    onClick?: () => void;
+    active?: boolean;
+    disabled?: boolean;
 }) {
     return (
         <button
             type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            disabled={disabled}
             className={cn(
-                'flex flex-1 items-center justify-center gap-2 rounded-none border-0 bg-transparent px-3 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                'flex flex-1 items-center justify-center gap-2 rounded-none border-0 bg-transparent px-3 py-3 text-xs uppercase tracking-wide transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                active ? 'text-primary font-bold' : 'text-muted-foreground font-semibold',
+                disabled && 'opacity-60 cursor-not-allowed',
                 className,
             )}
         >
-            <Icon className="h-4 w-4" />
+            <Icon
+                className="h-4 w-4"
+                strokeWidth={1.75}
+                fill={active ? 'currentColor' : 'none'}
+            />
             <span>{label}</span>
         </button>
     );
