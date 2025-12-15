@@ -23,11 +23,11 @@ export function AppSidebar() {
 
     const mainNavItems: NavItem[] = useMemo(
         () => [
-            {
-                title: t('nav.dashboard'),
-                href: dashboard(),
-                icon: LayoutGrid,
-            },
+            // {
+            //     title: t('nav.dashboard'),
+            //     href: dashboard(),
+            //     icon: LayoutGrid,
+            // },
             {
                 title: t('nav.feed'),
                 href: '/feed',
