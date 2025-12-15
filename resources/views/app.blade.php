@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+@php
+    $site = \Illuminate\Support\Facades\Schema::hasTable('site_settings')
+        ? \App\Models\SiteSetting::query()->latest()->first()
+        : null;
+
+    $siteName = $site?->name ?? config('app.name', 'Laravel');
+    $logoUrl = $site?->logo;
+    $logoVersion = $site?->updated_at?->timestamp;
+    $versionedLogo = $logoUrl ? $logoUrl.($logoVersion ? '?v='.$logoVersion : '') : null;
+@endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
     <head>
         <meta charset="utf-8">
@@ -30,16 +40,21 @@
             }
         </style>
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ $siteName }}</title>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        @if ($versionedLogo)
+            <link rel="icon" href="{{ $versionedLogo }}" type="image/png">
+            <link rel="apple-touch-icon" href="{{ $versionedLogo }}">
+        @else
+            <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+            <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+            <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+        @endif
 
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <meta name="app-name" content="{{ config('app.name', 'Laravel') }}">
+        <meta name="app-name" content="{{ $siteName }}">
 
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
