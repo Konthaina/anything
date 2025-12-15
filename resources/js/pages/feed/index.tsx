@@ -28,6 +28,7 @@ import { useI18n } from '@/contexts/language-context';
 import { type AppNotification, type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    ArrowUp,
     Bell,
     Edit3,
     Globe2,
@@ -134,6 +135,7 @@ export default function FeedPage() {
     const [liveUnreadNotifications, setLiveUnreadNotifications] = useState<number>(
         unreadNotificationCount,
     );
+    const [showScrollTop, setShowScrollTop] = useState(false);
 
     useEffect(() => {
         setLiveNotifications(notifications);
@@ -142,6 +144,21 @@ export default function FeedPage() {
     useEffect(() => {
         setLiveUnreadNotifications(unreadNotificationCount);
     }, [unreadNotificationCount]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleScroll = () => {
+            setShowScrollTop(window.scrollY > 400);
+        };
+
+        handleScroll();
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
 
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('feed.title'), href: '/feed' }],
@@ -203,6 +220,11 @@ export default function FeedPage() {
             },
         );
     }, [liveUnreadNotifications]);
+
+    const handleScrollTopClick = useCallback(() => {
+        if (typeof window === 'undefined') return;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
 
     const normalizedPosts = useMemo(() => {
         return posts
@@ -272,6 +294,10 @@ export default function FeedPage() {
                         unreadCount={liveUnreadNotifications}
                         onMarkAllRead={handleMarkAllNotificationsRead}
                     />
+                )}
+
+                {showScrollTop && (
+                    <ScrollToTopButton label={t('feed.scroll_to_top')} onClick={handleScrollTopClick} />
                 )}
             </div>
         </AppLayout>
@@ -1352,6 +1378,21 @@ function NotificationFloatingButton({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function ScrollToTopButton({ onClick, label }: { onClick: () => void; label: string }) {
+    return (
+        <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            className="fixed bottom-6 right-24 z-30 h-12 w-12 rounded-full shadow-lg hover:opacity-90 lg:bottom-8 lg:right-28"
+            onClick={onClick}
+            aria-label={label}
+        >
+            <ArrowUp className="h-5 w-5" />
+        </Button>
     );
 }
 
