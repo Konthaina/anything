@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PostLikesUpdated;
 use App\Models\Comment;
 use App\Models\Post;
+use App\Support\FeedCommentPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -65,7 +67,7 @@ class FeedController extends Controller
                     ],
                     'liked' => $likedLookup[$post->id] ?? false,
                     'comments' => $post->rootComments
-                        ->map(fn (Comment $comment) => $this->transformComment($comment))
+                        ->map(fn (Comment $comment) => FeedCommentPresenter::present($comment))
                         ->values(),
                 ];
             })
@@ -93,6 +95,10 @@ class FeedController extends Controller
             $post->increment('likes_count');
         }
 
+        $post->refresh();
+
+        event(new PostLikesUpdated($post));
+
         return back();
     }
 
@@ -100,7 +106,7 @@ class FeedController extends Controller
     {
         $data = $request->validate([
             'content' => ['required', 'string', 'max:2000'],
-            'images' => ['nullable', 'array', 'max:' . self::MAX_IMAGES],
+            'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
             'images.*' => ['image', 'max:5120'],
         ]);
 
@@ -123,7 +129,7 @@ class FeedController extends Controller
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:2000'],
-            'images' => ['nullable', 'array', 'max:' . self::MAX_IMAGES],
+            'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
             'images.*' => ['image', 'max:5120'],
             'remove_image' => ['nullable', 'boolean'],
         ]);
@@ -159,24 +165,6 @@ class FeedController extends Controller
         $post->delete();
 
         return back();
-    }
-
-    private function transformComment(Comment $comment): array
-    {
-        return [
-            'id' => $comment->id,
-            'content' => $comment->content,
-            'created_at' => $comment->created_at,
-            'user' => [
-                'id' => $comment->user->id,
-                'name' => $comment->user->name,
-                'email' => $comment->user->email,
-                'avatar' => $comment->user->avatar,
-            ],
-            'replies' => $comment->replies
-                ->map(fn (Comment $reply) => $this->transformComment($reply))
-                ->values(),
-        ];
     }
 
     private function gatherUploadedFiles(array|UploadedFile|null $files): array

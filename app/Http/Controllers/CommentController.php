@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PostCommentCreated;
 use App\Models\Comment;
 use App\Models\Post;
 use Illuminate\Http\RedirectResponse;
@@ -35,8 +36,10 @@ class CommentController extends Controller
             $parentId = $parentComment->id;
         }
 
-        DB::transaction(function () use ($post, $user, $data, $parentId) {
-            $post->comments()->create([
+        $comment = null;
+
+        DB::transaction(function () use ($post, $user, $data, $parentId, &$comment) {
+            $comment = $post->comments()->create([
                 'user_id' => $user->id,
                 'content' => trim($data['content']),
                 'parent_id' => $parentId,
@@ -44,6 +47,16 @@ class CommentController extends Controller
 
             $post->increment('comments_count');
         });
+
+        $post->refresh();
+
+        if ($comment) {
+            $comment
+                ->load('user:id,name,email,avatar_path')
+                ->setRelation('replies', collect());
+
+            event(new PostCommentCreated($post, $comment));
+        }
 
         return back();
     }

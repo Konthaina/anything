@@ -6,6 +6,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { I18nProvider } from './contexts/language-context';
 import { initializeTheme } from './hooks/use-appearance';
+import { configureEcho } from '@laravel/echo-react';
+
+configureEcho({
+    broadcaster: 'reverb',
+});
 
 const appNameFromMeta =
     (typeof document !== 'undefined'

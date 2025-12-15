@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import { getEchoInstance } from '@/lib/echo-client';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -36,7 +37,7 @@ import {
     Share2,
     Trash2,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface FeedUser {
     id: number;
@@ -65,6 +66,17 @@ interface FeedComment {
     user: FeedUser;
     parent_id?: number | null;
     replies?: FeedComment[];
+}
+
+interface PostLikesUpdatedPayload {
+    post_id: number | string;
+    likes_count?: number;
+}
+
+interface PostCommentCreatedPayload {
+    post_id: number | string;
+    comments_count?: number;
+    comment?: FeedComment;
 }
 
 function safeId() {
@@ -320,12 +332,27 @@ function PostCard({
     // ✅ optimistic like (no syncing effect)
     const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
     const [optimisticLikesCount, setOptimisticLikesCount] = useState<number | null>(null);
+    const [liveLikesCount, setLiveLikesCount] = useState(post.likes_count ?? 0);
+    const [liveCommentsCount, setLiveCommentsCount] = useState(post.comments_count ?? 0);
+    const [liveComments, setLiveComments] = useState<FeedComment[]>(post.comments ?? []);
+
+    useEffect(() => {
+        setLiveLikesCount(post.likes_count ?? 0);
+    }, [post.likes_count]);
+
+    useEffect(() => {
+        setLiveCommentsCount(post.comments_count ?? 0);
+    }, [post.comments_count]);
+
+    useEffect(() => {
+        setLiveComments(post.comments ?? []);
+    }, [post.comments]);
 
     const liked = optimisticLiked ?? Boolean(post.liked);
-    const likesCount = optimisticLikesCount ?? (post.likes_count ?? 0);
+    const likesCount = optimisticLikesCount ?? liveLikesCount;
 
-    const comments = post.comments ?? [];
-    const commentsCount = post.comments_count ?? 0;
+    const comments = liveComments;
+    const commentsCount = liveCommentsCount;
 
     const isAuthor = authUserId !== undefined && authUserId === post.user.id;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
@@ -342,6 +369,77 @@ function PostCard({
             : visibleImageUrls.length === 2
                 ? 'grid-cols-2'
                 : 'grid-cols-2 sm:grid-cols-3';
+
+    const idsMatch = useCallback((a?: number | string | null, b?: number | string | null) => {
+        if (a === undefined || a === null || b === undefined || b === null) {
+            return false;
+        }
+        return String(a) === String(b);
+    }, []);
+
+    const mergeIncomingComment = useCallback(
+        (incoming?: FeedComment) => {
+            if (!incoming) return;
+
+            const normalized = normalizeComment(incoming);
+            setLiveComments((current) => {
+                if (normalized.parent_id !== undefined && normalized.parent_id !== null) {
+                    return current.map((comment) => {
+                        if (idsMatch(comment.id, normalized.parent_id)) {
+                            const replies = comment.replies ?? [];
+                            const alreadyExists = replies.some((reply) => idsMatch(reply.id, normalized.id));
+
+                            return {
+                                ...comment,
+                                replies: alreadyExists ? replies : [normalized, ...replies],
+                            };
+                        }
+                        return comment;
+                    });
+                }
+
+                const exists = current.some((comment) => idsMatch(comment.id, normalized.id));
+
+                if (exists) {
+                    return current.map((comment) =>
+                        idsMatch(comment.id, normalized.id) ? normalized : comment,
+                    );
+                }
+
+                return [normalized, ...current];
+            });
+        },
+        [idsMatch],
+    );
+
+    useEffect(() => {
+        const echo = getEchoInstance();
+        if (!echo) return;
+
+        const channelName = `posts.${post.id}`;
+        const channel = echo.channel(channelName);
+
+        const handleLikes = (payload: PostLikesUpdatedPayload) => {
+            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            setLiveLikesCount(Math.max(0, payload.likes_count ?? 0));
+            setOptimisticLikesCount(null);
+        };
+
+        const handleComments = (payload: PostCommentCreatedPayload) => {
+            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            setLiveCommentsCount(Math.max(0, payload.comments_count ?? 0));
+            mergeIncomingComment(payload.comment);
+        };
+
+        channel.listen('PostLikesUpdated', handleLikes);
+        channel.listen('PostCommentCreated', handleComments);
+
+        return () => {
+            channel.stopListening('PostLikesUpdated');
+            channel.stopListening('PostCommentCreated');
+            echo.leaveChannel(channelName);
+        };
+    }, [post.id, mergeIncomingComment, idsMatch]);
 
     const handleLikeToggle = () => {
         if (likeProcessing) return;
@@ -507,12 +605,7 @@ function PostCard({
             </CardFooter>
 
             {commentsOpen && (
-                <CommentSection
-                    postId={post.id}
-                    comments={comments}
-                    getInitials={getInitials}
-                    onSubmitted={() => setCommentsOpen(true)}
-                />
+                <CommentSection postId={post.id} comments={comments} getInitials={getInitials} />
             )}
 
             <EditPostDialog
