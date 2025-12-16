@@ -9,13 +9,14 @@ use Illuminate\Support\Collection;
 
 class FeedPostPresenter
 {
-    /**
-     * @param  array<int, bool>  $likedLookup
-     */
-    public static function present(Post $post, array $likedLookup = []): array
+    public static function present(Post $post, array $lookups = [], bool $includeSharedPost = true): array
     {
+        $likedLookup = $lookups['liked'] ?? [];
+        $sharedLookup = $lookups['shared'] ?? [];
+
         $post->loadMissing([
             'user:id,name,email,avatar_path',
+            'sharedPost.user:id,name,email,avatar_path',
             'rootComments' => static function (HasMany $query): void {
                 $query
                     ->with([
@@ -49,9 +50,18 @@ class FeedPostPresenter
                 'avatar' => $post->user->avatar,
             ],
             'liked' => (bool) ($likedLookup[$post->id] ?? false),
+            'shared' => (bool) ($sharedLookup[$post->id] ?? false),
+            'shared_post' => $includeSharedPost && $post->sharedPost
+                ? self::presentShared($post->sharedPost, $lookups)
+                : null,
             'comments' => $rootComments
                 ->map(fn (Comment $comment) => FeedCommentPresenter::present($comment))
                 ->values(),
         ];
+    }
+
+    private static function presentShared(Post $post, array $lookups): array
+    {
+        return self::present($post, $lookups, includeSharedPost: false);
     }
 }

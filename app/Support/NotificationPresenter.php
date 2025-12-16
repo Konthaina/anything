@@ -29,6 +29,7 @@ class NotificationPresenter
             'post_unliked' => "{$actor} unliked your post",
             'post_commented' => "{$actor} commented on your post",
             'comment_replied' => "{$actor} replied to your comment",
+            'post_shared' => "{$actor} shared your post",
             default => "{$actor} interacted with you",
         };
     }

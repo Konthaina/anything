@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Events\PostCreated;
 use App\Events\PostDeleted;
 use App\Events\PostLikesUpdated;
+use App\Events\PostShared;
 use App\Events\PostUpdated;
 use App\Models\Post;
 use App\Notifications\PostLikedNotification;
+use App\Notifications\PostSharedNotification;
 use App\Notifications\PostUnlikedNotification;
 use App\Support\FeedPostPresenter;
 use App\Support\NotificationDispatcher;
@@ -38,9 +40,24 @@ class FeedController extends Controller
 
         $likedLookup = array_fill_keys($likedPostIds, true);
 
+        $sharedPostIds = $user
+            ? DB::table('post_shares')
+                ->where('user_id', $user->id)
+                ->pluck('post_id')
+                ->all()
+            : [];
+
+        $sharedLookup = array_fill_keys($sharedPostIds, true);
+
+        $lookups = [
+            'liked' => $likedLookup,
+            'shared' => $sharedLookup,
+        ];
+
         $posts = Post::query()
             ->with([
                 'user:id,name,email,avatar_path',
+                'sharedPost.user:id,name,email,avatar_path',
                 'rootComments' => function ($query) {
                     $query
                         ->with([
@@ -56,7 +73,7 @@ class FeedController extends Controller
             ])
             ->latest()
             ->get()
-            ->map(fn (Post $post) => FeedPostPresenter::present($post, $likedLookup))
+            ->map(fn (Post $post) => FeedPostPresenter::present($post, $lookups))
             ->values();
 
         $notifications = $user
@@ -106,6 +123,58 @@ class FeedController extends Controller
         $post->refresh();
 
         event(new PostLikesUpdated($post));
+
+        return back();
+    }
+
+    public function share(Request $request, Post $post): RedirectResponse
+    {
+        $user = $request->user();
+
+        $post->loadMissing('sharedPost');
+        $shareTarget = $post->sharedPost ?? $post;
+
+        $sharedPost = null;
+        $createdShare = false;
+
+        DB::transaction(function () use ($shareTarget, $user, &$sharedPost, &$createdShare): void {
+            $share = $shareTarget->shares()->firstOrCreate([
+                'user_id' => $user->id,
+            ]);
+
+            if (! $share->wasRecentlyCreated) {
+                return;
+            }
+
+            $shareTarget->increment('shares_count');
+            $createdShare = true;
+
+            $sharedPost = $user->posts()->create([
+                'content' => '',
+                'image_paths' => [],
+                'likes_count' => 0,
+                'comments_count' => 0,
+                'shares_count' => 0,
+                'shared_post_id' => $shareTarget->id,
+            ]);
+        });
+
+        if (! $createdShare || ! $sharedPost) {
+            return back()->withErrors([
+                'share' => __('You have already shared this post.'),
+            ]);
+        }
+
+        $shareTarget->refresh();
+        $sharedPost->load('user:id,name,email,avatar_path', 'sharedPost.user:id,name,email,avatar_path');
+
+        event(new PostCreated($sharedPost));
+        event(new PostShared($shareTarget, $user));
+
+        if ($shareTarget->user_id !== $user->id) {
+            $shareTarget->loadMissing('user');
+            NotificationDispatcher::send($shareTarget->user, new PostSharedNotification($shareTarget, $user));
+        }
 
         return back();
     }

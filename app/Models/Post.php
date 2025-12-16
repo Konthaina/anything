@@ -22,6 +22,7 @@ class Post extends Model
         'likes_count',
         'comments_count',
         'shares_count',
+        'shared_post_id',
     ];
 
     protected $appends = [
@@ -55,6 +56,16 @@ class Post extends Model
     public function rootComments(): HasMany
     {
         return $this->comments()->whereNull('parent_id');
+    }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(PostShare::class);
+    }
+
+    public function sharedPost(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'shared_post_id');
     }
 
     public function isLikedBy(?User $user): bool

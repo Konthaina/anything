@@ -58,6 +58,8 @@ interface FeedPost {
     created_at: string;
     user: FeedUser;
     liked?: boolean;
+    shared?: boolean;
+    shared_post?: FeedPost | null;
     comments?: FeedComment[];
 }
 
@@ -83,6 +85,12 @@ interface PostCommentCreatedPayload {
     post_id: number | string;
     comments_count?: number;
     comment?: FeedComment;
+}
+
+interface PostSharedPayload {
+    post_id: number | string;
+    shares_count?: number;
+    shared_by?: number | string;
 }
 
 interface PostCreatedPayload {
@@ -122,7 +130,7 @@ function normalizeComment(comment?: Partial<FeedComment>): FeedComment {
     };
 }
 
-function normalizePost(post?: Partial<FeedPost>): FeedPost {
+function normalizePost(post?: Partial<FeedPost>, includeShared = true): FeedPost {
     return {
         id: post?.id ?? safeId(),
         content: post?.content ?? '',
@@ -138,8 +146,29 @@ function normalizePost(post?: Partial<FeedPost>): FeedPost {
             avatar: null,
         },
         liked: Boolean(post?.liked),
+        shared: Boolean(post?.shared),
+        shared_post:
+            includeShared && post?.shared_post
+                ? normalizePost(post.shared_post as FeedPost, false)
+                : undefined,
         comments: (post?.comments ?? []).map((comment) => normalizeComment(comment)),
     };
+}
+
+function sanitizeImageUrls(urls?: string[] | null): string[] {
+    return (urls ?? []).filter((url) => url && !url.includes('via.placeholder.com'));
+}
+
+function resolveImageGridClass(count: number): string {
+    if (count === 1) {
+        return 'grid-cols-1';
+    }
+
+    if (count === 2) {
+        return 'grid-cols-2';
+    }
+
+    return 'grid-cols-2 sm:grid-cols-3';
 }
 
 function idsAreEqual(a?: number | string | null, b?: number | string | null): boolean {
@@ -238,6 +267,7 @@ export default function FeedPage() {
                             ? {
                                   ...normalized,
                                   liked: post.liked,
+                                  shared: post.shared,
                                   comments: post.comments,
                               }
                             : post,
@@ -260,6 +290,7 @@ export default function FeedPage() {
                         ? {
                               ...normalized,
                               liked: post.liked,
+                              shared: post.shared,
                               comments: post.comments,
                           }
                         : post,
@@ -274,14 +305,47 @@ export default function FeedPage() {
             setLivePosts((current) => current.filter((post) => !idsAreEqual(post.id, postId)));
         };
 
+        const handleShared = (payload: PostSharedPayload) => {
+            if (!payload || payload.post_id === undefined || payload.post_id === null) {
+                return;
+            }
+
+            setLivePosts((current) =>
+                current.map((post) => {
+                    let next = post;
+
+                    if (idsAreEqual(post.id, payload.post_id)) {
+                        next = {
+                            ...next,
+                            shares_count: payload.shares_count ?? post.shares_count,
+                        };
+                    }
+
+                    if (post.shared_post && idsAreEqual(post.shared_post.id, payload.post_id)) {
+                        next = {
+                            ...next,
+                            shared_post: {
+                                ...post.shared_post,
+                                shares_count: payload.shares_count ?? post.shared_post.shares_count,
+                            },
+                        };
+                    }
+
+                    return next;
+                }),
+            );
+        };
+
         channel.listen('.PostCreated', handleCreated);
         channel.listen('.PostUpdated', handleUpdated);
         channel.listen('.PostDeleted', handleDeleted);
+        channel.listen('.PostShared', handleShared);
 
         return () => {
             channel.stopListening('.PostCreated');
             channel.stopListening('.PostUpdated');
             channel.stopListening('.PostDeleted');
+            channel.stopListening('.PostShared');
             echo.leaveChannel(channelName);
         };
     }, []);
@@ -364,6 +428,7 @@ export default function FeedPage() {
                             post.id,
                             post.likes_count ?? 0,
                             post.comments_count ?? 0,
+                            post.shares_count ?? 0,
                             commentsSignature,
                         ].join('|');
                         return (
@@ -560,28 +625,27 @@ function PostCard({
     const [liveLikesCount, setLiveLikesCount] = useState(post.likes_count ?? 0);
     const [liveCommentsCount, setLiveCommentsCount] = useState(post.comments_count ?? 0);
     const [liveComments, setLiveComments] = useState<FeedComment[]>(post.comments ?? []);
+    const [liveSharesCount, setLiveSharesCount] = useState(post.shares_count ?? 0);
+    const [hasShared, setHasShared] = useState(Boolean(post.shared));
+    const [shareProcessing, setShareProcessing] = useState(false);
 
     const liked = optimisticLiked ?? Boolean(post.liked);
     const likesCount = optimisticLikesCount ?? liveLikesCount;
 
     const comments = liveComments;
     const commentsCount = liveCommentsCount;
+    const sharesCount = liveSharesCount;
 
     const isAuthor = authUserId !== undefined && authUserId === post.user.id;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
 
-    const sanitizedImageUrls = useMemo(() => {
-        const urls = post.image_urls ?? [];
-        return urls.filter((url) => url && !url.includes('via.placeholder.com'));
-    }, [post.image_urls]);
+    const sanitizedImageUrls = useMemo(() => sanitizeImageUrls(post.image_urls), [post.image_urls]);
 
     const visibleImageUrls = sanitizedImageUrls.filter((url) => !hiddenImages.includes(url));
-    const imageGridClass =
-        visibleImageUrls.length === 1
-            ? 'grid-cols-1'
-            : visibleImageUrls.length === 2
-                ? 'grid-cols-2'
-                : 'grid-cols-2 sm:grid-cols-3';
+    const imageGridClass = resolveImageGridClass(visibleImageUrls.length);
+    const sharedPost = post.shared_post ?? null;
+    const contentLines = useMemo(() => (post.content ?? '').split('\n'), [post.content]);
+    const hasContent = contentLines.some((line) => line.trim().length > 0);
 
     const idsMatch = useCallback(
         (a?: number | string | null, b?: number | string | null) => idsAreEqual(a, b),
@@ -642,15 +706,31 @@ function PostCard({
             mergeIncomingComment(payload.comment);
         };
 
+        const handleShares = (payload: PostSharedPayload) => {
+            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            setLiveSharesCount(Math.max(0, payload.shares_count ?? 0));
+
+            if (
+                payload.shared_by !== undefined &&
+                payload.shared_by !== null &&
+                authUserId !== undefined &&
+                idsMatch(payload.shared_by, authUserId)
+            ) {
+                setHasShared(true);
+            }
+        };
+
         channel.listen('.PostLikesUpdated', handleLikes);
         channel.listen('.PostCommentCreated', handleComments);
+        channel.listen('.PostShared', handleShares);
 
         return () => {
             channel.stopListening('.PostLikesUpdated');
             channel.stopListening('.PostCommentCreated');
+            channel.stopListening('.PostShared');
             echo.leaveChannel(channelName);
         };
-    }, [post.id, mergeIncomingComment, idsMatch]);
+    }, [post.id, mergeIncomingComment, idsMatch, authUserId]);
 
     const handleLikeToggle = () => {
         if (likeProcessing) return;
@@ -685,6 +765,29 @@ function PostCard({
                     setOptimisticLikesCount(null);
                 },
                 onFinish: () => setLikeProcessing(false),
+            },
+        );
+    };
+
+    const handleShare = () => {
+        if (shareProcessing || hasShared) return;
+
+        const previousCount = sharesCount;
+
+        setShareProcessing(true);
+        setHasShared(true);
+        setLiveSharesCount(previousCount + 1);
+
+        router.post(
+            `/feed/${post.id}/share`,
+            {},
+            {
+                preserveScroll: true,
+                onError: () => {
+                    setHasShared(false);
+                    setLiveSharesCount(previousCount);
+                },
+                onFinish: () => setShareProcessing(false),
             },
         );
     };
@@ -750,32 +853,79 @@ function PostCard({
             </CardHeader>
 
             <CardContent className="space-y-3 text-sm leading-relaxed text-foreground">
-                {(post.content ?? '').split('\n').map((line, idx) => (
-                    <p key={idx}>{renderLineWithLinks(line, idx)}</p>
-                ))}
+                {sharedPost ? (
+                    <>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">{post.user.name}</span>
+                            <Share2 className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-semibold text-foreground">{sharedPost.user.name}</span>
+                        </div>
 
-                {visibleImageUrls.length > 0 && (
-                    <div className={`grid w-full gap-2 ${imageGridClass}`}>
-                        {visibleImageUrls.map((url) => (
-                            <button
-                                key={url}
-                                type="button"
-                                onClick={() => setLightboxImage(url)}
-                                className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
-                            >
-                                <img
-                                    src={url}
-                                    alt=""
-                                    className="h-full w-full object-cover"
-                                    onError={() => {
-                                        setHiddenImages((prev) =>
-                                            prev.includes(url) ? prev : [...prev, url],
-                                        );
-                                    }}
-                                />
-                            </button>
+                        {hasContent &&
+                            contentLines.map((line, idx) => (
+                                <p key={`share-content-${idx}`}>{renderLineWithLinks(line, idx)}</p>
+                            ))}
+
+                        {visibleImageUrls.length > 0 && (
+                            <div className={`grid w-full gap-2 ${imageGridClass}`}>
+                                {visibleImageUrls.map((url) => (
+                                    <button
+                                        key={url}
+                                        type="button"
+                                        onClick={() => setLightboxImage(url)}
+                                        className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                                    >
+                                        <img
+                                            src={url}
+                                            alt=""
+                                            className="h-full w-full object-cover"
+                                            onError={() => {
+                                                setHiddenImages((prev) =>
+                                                    prev.includes(url) ? prev : [...prev, url],
+                                                );
+                                            }}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        <SharedPostPreview
+                            post={sharedPost}
+                            getInitials={getInitials}
+                            onImageClick={setLightboxImage}
+                        />
+                    </>
+                ) : (
+                    <>
+                        {contentLines.map((line, idx) => (
+                            <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                         ))}
-                    </div>
+
+                        {visibleImageUrls.length > 0 && (
+                            <div className={`grid w-full gap-2 ${imageGridClass}`}>
+                                {visibleImageUrls.map((url) => (
+                                    <button
+                                        key={url}
+                                        type="button"
+                                        onClick={() => setLightboxImage(url)}
+                                        className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                                    >
+                                        <img
+                                            src={url}
+                                            alt=""
+                                            className="h-full w-full object-cover"
+                                            onError={() => {
+                                                setHiddenImages((prev) =>
+                                                    prev.includes(url) ? prev : [...prev, url],
+                                                );
+                                            }}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
@@ -789,7 +939,7 @@ function PostCard({
                                 {formatCount(commentsCount)} {t('feed.comments')}
                             </span>
                             <span>
-                                {formatCount(post.shares_count)} {t('feed.shares')}
+                                {formatCount(sharesCount)} {t('feed.shares')}
                             </span>
                         </div>
                     </div>
@@ -811,7 +961,13 @@ function PostCard({
                         onClick={() => setCommentsOpen((prev) => !prev)}
                         active={commentsOpen}
                     />
-                    <ActionButton icon={Share2} label={t('feed.share')} />
+                    <ActionButton
+                        icon={Share2}
+                        label={t('feed.share')}
+                        onClick={handleShare}
+                        active={hasShared}
+                        disabled={shareProcessing || hasShared}
+                    />
                 </div>
             </CardFooter>
 
@@ -1334,6 +1490,70 @@ function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogPr
                 </DialogPrimitive.Content>
             </DialogPortal>
         </Dialog>
+    );
+}
+
+function SharedPostPreview({
+    post,
+    getInitials,
+    onImageClick,
+}: {
+    post: FeedPost;
+    getInitials: (value?: string | null) => string;
+    onImageClick: (url: string) => void;
+}) {
+    const [hiddenImages, setHiddenImages] = useState<string[]>([]);
+    const sanitizedImages = useMemo(
+        () => sanitizeImageUrls(post.image_urls).filter((url) => !hiddenImages.includes(url)),
+        [post.image_urls, hiddenImages],
+    );
+    const imageGridClass = resolveImageGridClass(sanitizedImages.length);
+    const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
+
+    return (
+        <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
+            <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10">
+                    <AvatarImage src={post.user.avatar ?? undefined} alt={post.user.name} />
+                    <AvatarFallback className="bg-muted text-foreground">
+                        {getInitials(post.user.name)}
+                    </AvatarFallback>
+                </Avatar>
+
+                <div className="flex flex-col">
+                    <div className="text-sm font-semibold leading-tight text-foreground">
+                        {post.user.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{timestamp}</div>
+                </div>
+            </div>
+
+            {(post.content ?? '').split('\n').map((line, idx) => (
+                <p key={`shared-preview-${idx}`}>{renderLineWithLinks(line, idx)}</p>
+            ))}
+
+            {sanitizedImages.length > 0 && (
+                <div className={`grid w-full gap-2 ${imageGridClass}`}>
+                    {sanitizedImages.map((url) => (
+                        <button
+                            key={url}
+                            type="button"
+                            onClick={() => onImageClick(url)}
+                            className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                        >
+                            <img
+                                src={url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                onError={() => {
+                                    setHiddenImages((prev) => (prev.includes(url) ? prev : [...prev, url]));
+                                }}
+                            />
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }
 
