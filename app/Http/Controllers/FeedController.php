@@ -139,21 +139,19 @@ class FeedController extends Controller
 
         $post->loadMissing('sharedPost');
         $shareTarget = $post->sharedPost ?? $post;
+        $resharingSharedPost = ! $post->is($shareTarget);
 
         $sharedPost = null;
-        $createdShare = false;
 
-        DB::transaction(function () use ($shareTarget, $shareContent, $user, &$sharedPost, &$createdShare): void {
-            $share = $shareTarget->shares()->firstOrCreate([
+        DB::transaction(function () use ($shareTarget, $shareContent, $user, $post, $resharingSharedPost, &$sharedPost): void {
+            $shareTarget->shares()->create([
                 'user_id' => $user->id,
             ]);
 
-            if (! $share->wasRecentlyCreated) {
-                return;
-            }
-
             $shareTarget->increment('shares_count');
-            $createdShare = true;
+            if ($resharingSharedPost) {
+                $post->increment('shares_count');
+            }
 
             $sharedPost = $user->posts()->create([
                 'content' => $shareContent,
@@ -165,17 +163,23 @@ class FeedController extends Controller
             ]);
         });
 
-        if (! $createdShare || ! $sharedPost) {
+        if (! $sharedPost) {
             return back()->withErrors([
-                'share' => __('You have already shared this post.'),
+                'share' => __('Unable to share this post at the moment.'),
             ]);
         }
 
         $shareTarget->refresh();
+        if ($resharingSharedPost) {
+            $post->refresh();
+        }
         $sharedPost->load('user:id,name,email,avatar_path', 'sharedPost.user:id,name,email,avatar_path');
 
         event(new PostCreated($sharedPost));
         event(new PostShared($shareTarget, $user));
+        if ($resharingSharedPost) {
+            event(new PostShared($post, $user));
+        }
 
         if ($shareTarget->user_id !== $user->id) {
             $shareTarget->loadMissing('user');

@@ -6,6 +6,7 @@ use App\Events\PostShared;
 use App\Events\PostUpdated;
 use App\Models\Post;
 use App\Models\User;
+use App\Models\PostShare;
 use App\Notifications\PostSharedNotification;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
@@ -141,10 +142,47 @@ it('shares the original post when resharing an existing share', function () {
     });
 });
 
-it('does not allow the same user to share the same post twice', function () {
+it('increments share counts on both original and shared posts when resharing', function () {
+    $author = User::factory()->create();
+    $original = Post::factory()->for($author)->create([
+        'content' => 'Original post',
+        'shares_count' => 0,
+    ]);
+
+    $firstSharer = User::factory()->create();
+    $this->actingAs($firstSharer)
+        ->from(route('feed.index', absolute: false))
+        ->post(route('feed.share', $original), [
+            'content' => 'Sharing once',
+        ])
+        ->assertRedirect(route('feed.index', absolute: false));
+
+    $sharedPost = Post::query()
+        ->where('shared_post_id', $original->id)
+        ->where('user_id', $firstSharer->id)
+        ->firstOrFail();
+
+    expect($original->refresh()->shares_count)->toBe(1);
+    expect($sharedPost->shares_count)->toBe(0);
+
+    $secondSharer = User::factory()->create();
+    $this->actingAs($secondSharer)
+        ->from(route('feed.index', absolute: false))
+        ->post(route('feed.share', $sharedPost), [
+            'content' => 'Sharing again',
+        ])
+        ->assertRedirect(route('feed.index', absolute: false));
+
+    expect($original->refresh()->shares_count)->toBe(2);
+    expect($sharedPost->refresh()->shares_count)->toBe(1);
+});
+
+it('allows the same user to share the same post multiple times', function () {
     $author = User::factory()->create();
     $user = User::factory()->create();
-    $post = Post::factory()->for($author)->create();
+    $post = Post::factory()->for($author)->create([
+        'shares_count' => 0,
+    ]);
 
     $this->actingAs($user)
         ->from(route('feed.index', absolute: false))
@@ -156,9 +194,11 @@ it('does not allow the same user to share the same post twice', function () {
     $this->actingAs($user)
         ->from(route('feed.index', absolute: false))
         ->post(route('feed.share', $post), [
-            'content' => 'Second attempt',
+            'content' => 'Second share',
         ])
-        ->assertSessionHasErrors(['share']);
+        ->assertRedirect(route('feed.index', absolute: false));
 
-    expect(Post::query()->where('shared_post_id', $post->id)->where('user_id', $user->id)->count())->toBe(1);
+    expect(Post::query()->where('shared_post_id', $post->id)->where('user_id', $user->id)->count())->toBe(2);
+    expect(PostShare::query()->where('post_id', $post->id)->where('user_id', $user->id)->count())->toBe(2);
+    expect($post->refresh()->shares_count)->toBe(2);
 });

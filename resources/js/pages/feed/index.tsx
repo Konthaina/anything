@@ -750,7 +750,7 @@ function PostCard({
     };
 
     const handleShareClick = () => {
-        if (hasShared) return;
+        if (shareProcessing) return;
         setShareDialogOpen(true);
     };
 
@@ -792,23 +792,22 @@ function PostCard({
     };
 
     const handleShareSubmit = () => {
-        if (shareProcessing || hasShared) return;
+        if (shareProcessing) return;
 
         const previousCount = sharesCount;
 
         setShareProcessing(true);
-        setHasShared(true);
         setLiveSharesCount(previousCount + 1);
 
         shareForm.post(`/feed/${post.id}/share`, {
             preserveScroll: true,
             onSuccess: () => {
+                setHasShared(true);
                 shareForm.reset();
                 shareForm.clearErrors();
                 setShareDialogOpen(false);
             },
             onError: () => {
-                setHasShared(false);
                 setLiveSharesCount(previousCount);
             },
             onFinish: () => setShareProcessing(false),
@@ -989,7 +988,7 @@ function PostCard({
                         label={t('feed.share')}
                         onClick={handleShareClick}
                         active={hasShared}
-                        disabled={shareProcessing || hasShared}
+                        disabled={shareProcessing}
                     />
                 </div>
             </CardFooter>
@@ -1012,7 +1011,6 @@ function PostCard({
                 onChange={handleShareNoteChange}
                 onSubmit={handleShareSubmit}
                 submitting={shareProcessing}
-                disabled={hasShared}
                 error={shareForm.errors.content}
             />
 
@@ -1539,7 +1537,6 @@ interface ShareDialogProps {
     onChange: (value: string) => void;
     onSubmit: () => void;
     submitting: boolean;
-    disabled?: boolean;
     error?: string;
 }
 
@@ -1550,7 +1547,6 @@ function ShareDialog({
     onChange,
     onSubmit,
     submitting,
-    disabled,
     error,
 }: ShareDialogProps) {
     const { t } = useI18n();
@@ -1587,7 +1583,7 @@ function ShareDialog({
                         >
                             {t('common.cancel')}
                         </Button>
-                        <Button type="submit" disabled={submitting || disabled}>
+                        <Button type="submit" disabled={submitting}>
                             {submitting ? t('common.loading') : t('feed.share_dialog_action')}
                         </Button>
                     </DialogFooter>
