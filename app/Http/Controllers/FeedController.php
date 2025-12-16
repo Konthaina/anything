@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PostCreated;
+use App\Events\PostDeleted;
 use App\Events\PostLikesUpdated;
-use App\Models\Comment;
+use App\Events\PostUpdated;
 use App\Models\Post;
-use App\Support\FeedCommentPresenter;
-use App\Support\NotificationDispatcher;
-use App\Support\NotificationPresenter;
 use App\Notifications\PostLikedNotification;
 use App\Notifications\PostUnlikedNotification;
+use App\Support\FeedPostPresenter;
+use App\Support\NotificationDispatcher;
+use App\Support\NotificationPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -54,27 +56,7 @@ class FeedController extends Controller
             ])
             ->latest()
             ->get()
-            ->map(function (Post $post) use ($likedLookup) {
-                return [
-                    'id' => $post->id,
-                    'content' => $post->content,
-                    'image_urls' => $post->image_urls,
-                    'likes_count' => $post->likes_count,
-                    'comments_count' => $post->comments_count,
-                    'shares_count' => $post->shares_count,
-                    'created_at' => $post->created_at,
-                    'user' => [
-                        'id' => $post->user->id,
-                        'name' => $post->user->name,
-                        'email' => $post->user->email,
-                        'avatar' => $post->user->avatar,
-                    ],
-                    'liked' => $likedLookup[$post->id] ?? false,
-                    'comments' => $post->rootComments
-                        ->map(fn (Comment $comment) => FeedCommentPresenter::present($comment))
-                        ->values(),
-                ];
-            })
+            ->map(fn (Post $post) => FeedPostPresenter::present($post, $likedLookup))
             ->values();
 
         $notifications = $user
@@ -138,13 +120,15 @@ class FeedController extends Controller
 
         $imagePaths = $this->storeUploadedImages($this->gatherUploadedFiles($request->file('images')));
 
-        $request->user()->posts()->create([
+        $post = $request->user()->posts()->create([
             'content' => $data['content'],
             'image_paths' => $imagePaths,
             'likes_count' => 0,
             'comments_count' => 0,
             'shares_count' => 0,
         ]);
+
+        event(new PostCreated($post));
 
         return back();
     }
@@ -179,6 +163,10 @@ class FeedController extends Controller
             'image_paths' => $imagePaths,
         ]);
 
+        $post->refresh();
+
+        event(new PostUpdated($post));
+
         return back();
     }
 
@@ -188,7 +176,11 @@ class FeedController extends Controller
 
         $this->deleteStoredImages($post->image_paths ?? []);
 
+        $postId = $post->id;
+
         $post->delete();
+
+        event(new PostDeleted($postId));
 
         return back();
     }
@@ -231,5 +223,4 @@ class FeedController extends Controller
 
         Storage::disk('public')->delete($path);
     }
-
 }

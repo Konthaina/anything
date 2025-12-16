@@ -85,6 +85,18 @@ interface PostCommentCreatedPayload {
     comment?: FeedComment;
 }
 
+interface PostCreatedPayload {
+    post?: FeedPost;
+}
+
+interface PostUpdatedPayload {
+    post?: FeedPost;
+}
+
+interface PostDeletedPayload {
+    post_id?: number | string;
+}
+
 function safeId() {
     return (
         (typeof crypto !== 'undefined' &&
@@ -110,6 +122,34 @@ function normalizeComment(comment?: Partial<FeedComment>): FeedComment {
     };
 }
 
+function normalizePost(post?: Partial<FeedPost>): FeedPost {
+    return {
+        id: post?.id ?? safeId(),
+        content: post?.content ?? '',
+        image_urls: post?.image_urls ?? [],
+        likes_count: post?.likes_count ?? 0,
+        comments_count: post?.comments_count ?? 0,
+        shares_count: post?.shares_count ?? 0,
+        created_at: post?.created_at ?? new Date().toISOString(),
+        user: post?.user ?? {
+            id: 0,
+            name: 'Unknown',
+            email: '',
+            avatar: null,
+        },
+        liked: Boolean(post?.liked),
+        comments: (post?.comments ?? []).map((comment) => normalizeComment(comment)),
+    };
+}
+
+function idsAreEqual(a?: number | string | null, b?: number | string | null): boolean {
+    if (a === undefined || a === null || b === undefined || b === null) {
+        return false;
+    }
+
+    return String(a) === String(b);
+}
+
 const MAX_IMAGES = 7;
 
 export default function FeedPage() {
@@ -125,7 +165,13 @@ export default function FeedPage() {
             notifications_unread_count?: number;
         }
     >().props;
-    const posts = useMemo(() => pagePosts ?? [], [pagePosts]);
+    const posts = useMemo(() => {
+        return (pagePosts ?? []).filter((post): post is FeedPost => Boolean(post));
+    }, [pagePosts]);
+    const normalizedInitialPosts = useMemo<FeedPost[]>(() => {
+        return posts.map((post) => normalizePost(post));
+    }, [posts]);
+    const [livePosts, setLivePosts] = useState<FeedPost[]>(normalizedInitialPosts);
     const notifications = useMemo(() => pageNotifications ?? [], [pageNotifications]);
     const unreadNotificationCount = notificationsUnreadCount ?? 0;
     const authUserId = auth?.user?.id;
@@ -136,6 +182,10 @@ export default function FeedPage() {
         unreadNotificationCount,
     );
     const [showScrollTop, setShowScrollTop] = useState(false);
+
+    useEffect(() => {
+        setLivePosts(normalizedInitialPosts);
+    }, [normalizedInitialPosts]);
 
     useEffect(() => {
         setLiveNotifications(notifications);
@@ -166,6 +216,75 @@ export default function FeedPage() {
     );
 
     const getInitials = useInitials();
+
+    useEffect(() => {
+        const echo = getEchoInstance();
+        if (!echo) return;
+
+        const channelName = 'posts';
+        const channel = echo.channel(channelName);
+
+        const handleCreated = (payload: PostCreatedPayload) => {
+            const incoming = payload?.post;
+            if (!incoming) return;
+
+            const normalized = normalizePost(incoming);
+
+            setLivePosts((current) => {
+                const exists = current.some((post) => idsAreEqual(post.id, normalized.id));
+                if (exists) {
+                    return current.map((post) =>
+                        idsAreEqual(post.id, normalized.id)
+                            ? {
+                                  ...normalized,
+                                  liked: post.liked,
+                                  comments: post.comments,
+                              }
+                            : post,
+                    );
+                }
+
+                return [normalized, ...current];
+            });
+        };
+
+        const handleUpdated = (payload: PostUpdatedPayload) => {
+            const incoming = payload?.post;
+            if (!incoming) return;
+
+            const normalized = normalizePost(incoming);
+
+            setLivePosts((current) =>
+                current.map((post) =>
+                    idsAreEqual(post.id, normalized.id)
+                        ? {
+                              ...normalized,
+                              liked: post.liked,
+                              comments: post.comments,
+                          }
+                        : post,
+                ),
+            );
+        };
+
+        const handleDeleted = (payload: PostDeletedPayload) => {
+            const postId = payload?.post_id;
+            if (!postId) return;
+
+            setLivePosts((current) => current.filter((post) => !idsAreEqual(post.id, postId)));
+        };
+
+        channel.listen('.PostCreated', handleCreated);
+        channel.listen('.PostUpdated', handleUpdated);
+        channel.listen('.PostDeleted', handleDeleted);
+
+        return () => {
+            channel.stopListening('.PostCreated');
+            channel.stopListening('.PostUpdated');
+            channel.stopListening('.PostDeleted');
+            echo.leaveChannel(channelName);
+        };
+    }, []);
 
     useEffect(() => {
         if (!authUserId) return;
@@ -226,28 +345,6 @@ export default function FeedPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
-    const normalizedPosts = useMemo(() => {
-        return posts
-            .filter(Boolean)
-            .map((post) => ({
-                id: post?.id ?? safeId(),
-                content: post?.content ?? '',
-                image_urls: post?.image_urls ?? [],
-                likes_count: post?.likes_count ?? 0,
-                comments_count: post?.comments_count ?? 0,
-                shares_count: post?.shares_count ?? 0,
-                created_at: post?.created_at ?? new Date().toISOString(),
-                user: post?.user ?? {
-                    id: 0,
-                    name: 'Unknown',
-                    email: '',
-                    avatar: null,
-                },
-                liked: Boolean(post?.liked),
-                comments: (post?.comments ?? []).map((comment) => normalizeComment(comment)),
-            }));
-    }, [posts]);
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('feed.title')} />
@@ -258,7 +355,7 @@ export default function FeedPage() {
                 )}
 
                 <div className="space-y-4">
-                    {normalizedPosts.map((post) => {
+                    {livePosts.map((post) => {
                         const imageSignature = (post.image_urls ?? []).join('|');
                         const commentsSignature = (post.comments ?? [])
                             .map((comment) => comment.id)
@@ -279,7 +376,7 @@ export default function FeedPage() {
                         );
                     })}
 
-                    {normalizedPosts.length === 0 && (
+                    {livePosts.length === 0 && (
                         <Card className="border-slate-800 bg-slate-900/80 text-slate-100">
                             <CardContent className="py-10 text-center text-sm text-slate-400">
                                 {t('feed.empty')}
@@ -486,12 +583,10 @@ function PostCard({
                 ? 'grid-cols-2'
                 : 'grid-cols-2 sm:grid-cols-3';
 
-    const idsMatch = useCallback((a?: number | string | null, b?: number | string | null) => {
-        if (a === undefined || a === null || b === undefined || b === null) {
-            return false;
-        }
-        return String(a) === String(b);
-    }, []);
+    const idsMatch = useCallback(
+        (a?: number | string | null, b?: number | string | null) => idsAreEqual(a, b),
+        [],
+    );
 
     const mergeIncomingComment = useCallback(
         (incoming?: FeedComment) => {
