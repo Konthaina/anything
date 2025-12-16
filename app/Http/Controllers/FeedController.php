@@ -131,13 +131,19 @@ class FeedController extends Controller
     {
         $user = $request->user();
 
+        $data = $request->validate([
+            'content' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $shareContent = trim((string) ($data['content'] ?? ''));
+
         $post->loadMissing('sharedPost');
         $shareTarget = $post->sharedPost ?? $post;
 
         $sharedPost = null;
         $createdShare = false;
 
-        DB::transaction(function () use ($shareTarget, $user, &$sharedPost, &$createdShare): void {
+        DB::transaction(function () use ($shareTarget, $shareContent, $user, &$sharedPost, &$createdShare): void {
             $share = $shareTarget->shares()->firstOrCreate([
                 'user_id' => $user->id,
             ]);
@@ -150,7 +156,7 @@ class FeedController extends Controller
             $createdShare = true;
 
             $sharedPost = $user->posts()->create([
-                'content' => '',
+                'content' => $shareContent,
                 'image_paths' => [],
                 'likes_count' => 0,
                 'comments_count' => 0,

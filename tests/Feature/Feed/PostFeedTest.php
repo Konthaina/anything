@@ -74,10 +74,12 @@ it('broadcasts a PostShared event when a user shares a post', function () {
 
     $this->actingAs($user)
         ->from(route('feed.index', absolute: false))
-        ->post(route('feed.share', $post))
+        ->post(route('feed.share', $post), [
+            'content' => 'Check this out',
+        ])
         ->assertRedirect(route('feed.index', absolute: false));
 
-    expect(Post::query()->where('shared_post_id', $post->id)->where('user_id', $user->id)->count())->toBe(1);
+    expect(Post::query()->where('shared_post_id', $post->id)->where('user_id', $user->id)->value('content'))->toBe('Check this out');
     expect($post->refresh()->shares_count)->toBe(1);
 
     Event::assertDispatched(PostShared::class, function (PostShared $event) use ($post, $user) {
@@ -96,7 +98,9 @@ it('notifies the post owner when someone else shares their post', function () {
 
     $this->actingAs($sharer)
         ->from(route('feed.index', absolute: false))
-        ->post(route('feed.share', $post))
+        ->post(route('feed.share', $post), [
+            'content' => 'Sharing your post',
+        ])
         ->assertRedirect(route('feed.index', absolute: false));
 
     Notification::assertSentTo(
@@ -124,7 +128,9 @@ it('shares the original post when resharing an existing share', function () {
 
     $this->actingAs($secondSharer)
         ->from(route('feed.index', absolute: false))
-        ->post(route('feed.share', $sharedPost))
+        ->post(route('feed.share', $sharedPost), [
+            'content' => 'Boosting this again',
+        ])
         ->assertRedirect(route('feed.index', absolute: false));
 
     expect(Post::query()->where('shared_post_id', $original->id)->where('user_id', $secondSharer->id)->exists())->toBeTrue();
@@ -142,12 +148,16 @@ it('does not allow the same user to share the same post twice', function () {
 
     $this->actingAs($user)
         ->from(route('feed.index', absolute: false))
-        ->post(route('feed.share', $post))
+        ->post(route('feed.share', $post), [
+            'content' => 'First share',
+        ])
         ->assertRedirect(route('feed.index', absolute: false));
 
     $this->actingAs($user)
         ->from(route('feed.index', absolute: false))
-        ->post(route('feed.share', $post))
+        ->post(route('feed.share', $post), [
+            'content' => 'Second attempt',
+        ])
         ->assertSessionHasErrors(['share']);
 
     expect(Post::query()->where('shared_post_id', $post->id)->where('user_id', $user->id)->count())->toBe(1);

@@ -1,4 +1,4 @@
-{
+﻿{
     "common": {
         "app_name": "Laravel Starter",
         "language": "ភាសា",
@@ -290,6 +290,10 @@
         "comment": "បញ្ចេញមតិ",
         "reply": "ឆ្លើយតប",
         "share": "ចែករំលែក",
+        "share_dialog_title": "ចែករំលែកប្រកាស",
+        "share_dialog_description": "ចែករំលែកប្រកាសនេះជាមួយមិត្តភក្តិរបស់អ្នក។",
+        "share_dialog_placeholder": "និយាយអ្វីខ្លួនអំពីប្រកាសនេះ...",
+        "share_dialog_action": "ចែករំលែកឥឡូវ",
         "view_image": "មើលរូបភាព",
         "view_image_description": "បើករូបភាពទំហំពេញនៅក្នុងម៉ូដាល់",
         "edit": "កែសម្រួលប្រកាស",

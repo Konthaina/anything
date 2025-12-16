@@ -1,4 +1,4 @@
-import InputError from '@/components/input-error';
+﻿import InputError from '@/components/input-error';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -265,11 +265,11 @@ export default function FeedPage() {
                     return current.map((post) =>
                         idsAreEqual(post.id, normalized.id)
                             ? {
-                                  ...normalized,
-                                  liked: post.liked,
-                                  shared: post.shared,
-                                  comments: post.comments,
-                              }
+                                ...normalized,
+                                liked: post.liked,
+                                shared: post.shared,
+                                comments: post.comments,
+                            }
                             : post,
                     );
                 }
@@ -288,11 +288,11 @@ export default function FeedPage() {
                 current.map((post) =>
                     idsAreEqual(post.id, normalized.id)
                         ? {
-                              ...normalized,
-                              liked: post.liked,
-                              shared: post.shared,
-                              comments: post.comments,
-                          }
+                            ...normalized,
+                            liked: post.liked,
+                            shared: post.shared,
+                            comments: post.comments,
+                        }
                         : post,
                 ),
             );
@@ -486,7 +486,7 @@ function CreatePostCard({
 
     useEffect(() => {
         return () => cleanupPreviews();
-         
+
     }, []);
 
     return (
@@ -618,6 +618,7 @@ function PostCard({
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
     // ✅ optimistic like (no syncing effect)
     const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
@@ -628,6 +629,9 @@ function PostCard({
     const [liveSharesCount, setLiveSharesCount] = useState(post.shares_count ?? 0);
     const [hasShared, setHasShared] = useState(Boolean(post.shared));
     const [shareProcessing, setShareProcessing] = useState(false);
+    const shareForm = useForm<{ content: string }>({
+        content: '',
+    });
 
     const liked = optimisticLiked ?? Boolean(post.liked);
     const likesCount = optimisticLikesCount ?? liveLikesCount;
@@ -647,11 +651,6 @@ function PostCard({
     const contentLines = useMemo(() => (post.content ?? '').split('\n'), [post.content]);
     const hasContent = contentLines.some((line) => line.trim().length > 0);
 
-    const idsMatch = useCallback(
-        (a?: number | string | null, b?: number | string | null) => idsAreEqual(a, b),
-        [],
-    );
-
     const mergeIncomingComment = useCallback(
         (incoming?: FeedComment) => {
             if (!incoming) return;
@@ -660,9 +659,9 @@ function PostCard({
             setLiveComments((current) => {
                 if (normalized.parent_id !== undefined && normalized.parent_id !== null) {
                     return current.map((comment) => {
-                        if (idsMatch(comment.id, normalized.parent_id)) {
+                        if (idsAreEqual(comment.id, normalized.parent_id)) {
                             const replies = comment.replies ?? [];
-                            const alreadyExists = replies.some((reply) => idsMatch(reply.id, normalized.id));
+                            const alreadyExists = replies.some((reply) => idsAreEqual(reply.id, normalized.id));
 
                             return {
                                 ...comment,
@@ -673,18 +672,18 @@ function PostCard({
                     });
                 }
 
-                const exists = current.some((comment) => idsMatch(comment.id, normalized.id));
+                const exists = current.some((comment) => idsAreEqual(comment.id, normalized.id));
 
                 if (exists) {
                     return current.map((comment) =>
-                        idsMatch(comment.id, normalized.id) ? normalized : comment,
+                        idsAreEqual(comment.id, normalized.id) ? normalized : comment,
                     );
                 }
 
                 return [normalized, ...current];
             });
         },
-        [idsMatch],
+        [],
     );
 
     useEffect(() => {
@@ -695,26 +694,26 @@ function PostCard({
         const channel = echo.channel(channelName);
 
         const handleLikes = (payload: PostLikesUpdatedPayload) => {
-            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            if (!payload || !idsAreEqual(payload.post_id, post.id)) return;
             setLiveLikesCount(Math.max(0, payload.likes_count ?? 0));
             setOptimisticLikesCount(null);
         };
 
         const handleComments = (payload: PostCommentCreatedPayload) => {
-            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            if (!payload || !idsAreEqual(payload.post_id, post.id)) return;
             setLiveCommentsCount(Math.max(0, payload.comments_count ?? 0));
             mergeIncomingComment(payload.comment);
         };
 
         const handleShares = (payload: PostSharedPayload) => {
-            if (!payload || !idsMatch(payload.post_id, post.id)) return;
+            if (!payload || !idsAreEqual(payload.post_id, post.id)) return;
             setLiveSharesCount(Math.max(0, payload.shares_count ?? 0));
 
             if (
                 payload.shared_by !== undefined &&
                 payload.shared_by !== null &&
                 authUserId !== undefined &&
-                idsMatch(payload.shared_by, authUserId)
+                idsAreEqual(payload.shared_by, authUserId)
             ) {
                 setHasShared(true);
             }
@@ -730,7 +729,30 @@ function PostCard({
             channel.stopListening('.PostShared');
             echo.leaveChannel(channelName);
         };
-    }, [post.id, mergeIncomingComment, idsMatch, authUserId]);
+    }, [post.id, mergeIncomingComment, authUserId]);
+
+    const handleShareDialogChange = (open: boolean) => {
+        if (shareProcessing) return;
+        setShareDialogOpen(open);
+
+        if (!open) {
+            shareForm.reset();
+            shareForm.clearErrors();
+        }
+    };
+
+    const handleShareNoteChange = (value: string) => {
+        shareForm.setData('content', value);
+
+        if (shareForm.errors.content) {
+            shareForm.clearErrors('content');
+        }
+    };
+
+    const handleShareClick = () => {
+        if (hasShared) return;
+        setShareDialogOpen(true);
+    };
 
     const handleLikeToggle = () => {
         if (likeProcessing) return;
@@ -769,7 +791,7 @@ function PostCard({
         );
     };
 
-    const handleShare = () => {
+    const handleShareSubmit = () => {
         if (shareProcessing || hasShared) return;
 
         const previousCount = sharesCount;
@@ -778,18 +800,19 @@ function PostCard({
         setHasShared(true);
         setLiveSharesCount(previousCount + 1);
 
-        router.post(
-            `/feed/${post.id}/share`,
-            {},
-            {
-                preserveScroll: true,
-                onError: () => {
-                    setHasShared(false);
-                    setLiveSharesCount(previousCount);
-                },
-                onFinish: () => setShareProcessing(false),
+        shareForm.post(`/feed/${post.id}/share`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                shareForm.reset();
+                shareForm.clearErrors();
+                setShareDialogOpen(false);
             },
-        );
+            onError: () => {
+                setHasShared(false);
+                setLiveSharesCount(previousCount);
+            },
+            onFinish: () => setShareProcessing(false),
+        });
     };
 
     return (
@@ -964,7 +987,7 @@ function PostCard({
                     <ActionButton
                         icon={Share2}
                         label={t('feed.share')}
-                        onClick={handleShare}
+                        onClick={handleShareClick}
                         active={hasShared}
                         disabled={shareProcessing || hasShared}
                     />
@@ -982,6 +1005,16 @@ function PostCard({
                 onOpenChange={setIsEditOpen}
             />
             <DeletePostDialog postId={post.id} open={isDeleteOpen} onOpenChange={setIsDeleteOpen} />
+            <ShareDialog
+                open={shareDialogOpen}
+                onOpenChange={handleShareDialogChange}
+                value={shareForm.data.content}
+                onChange={handleShareNoteChange}
+                onSubmit={handleShareSubmit}
+                submitting={shareProcessing}
+                disabled={hasShared}
+                error={shareForm.errors.content}
+            />
 
             <ImageViewerDialog
                 imageUrl={lightboxImage}
@@ -1012,7 +1045,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    // ✅ refs for previews (no setState in useEffect)
+    // âœ… refs for previews (no setState in useEffect)
     const previewBlobRef = useRef<string[]>([]);
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
     const [, rerender] = useState(0);
@@ -1023,8 +1056,8 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         previewBlobRef.current = [];
     };
 
-    // ✅ keep this effect only for cleaning external resources (blob urls) + resetting input
-    // ✅ NO setState here
+    // âœ… keep this effect only for cleaning external resources (blob urls) + resetting input
+    // âœ… NO setState here
     useEffect(() => {
         // reset form fields when switching post or opening dialog
         setData({
@@ -1048,7 +1081,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         return () => {
             cleanupBlobUrls();
         };
-         
+
     }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1097,11 +1130,15 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         });
     };
 
-    const previewSources = form.data.remove_image
+    const isSharePost = Boolean(post.shared_post);
+
+    const previewSources = isSharePost
         ? []
-        : previewBlobRef.current.length > 0
-            ? previewBlobRef.current
-            : post.image_urls ?? [];
+        : form.data.remove_image
+            ? []
+            : previewBlobRef.current.length > 0
+                ? previewBlobRef.current
+                : post.image_urls ?? [];
 
     const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewRef.current.has(url));
 
@@ -1131,40 +1168,42 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                         <InputError message={form.errors.content} />
                     </div>
 
-                    <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <ImageIcon className="h-4 w-4" />
-                            <span>{t('feed.attach_image')}</span>
+                    {!isSharePost && (
+                        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <ImageIcon className="h-4 w-4" />
+                                <span>{t('feed.attach_image')}</span>
+                            </div>
+
+                            <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
+                                <span>{t('feed.browse')}</span>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    name="images[]"
+                                    accept="image/*"
+                                    multiple
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                    onChange={handleFileChange}
+                                />
+                            </label>
+
+                            <InputError message={form.errors.images} />
+
+                            <div className="flex items-center justify-end">
+                                <Button
+                                    type="button"
+                                    variant={form.data.remove_image ? 'destructive' : 'outline'}
+                                    size="sm"
+                                    onClick={handleRemoveImage}
+                                >
+                                    {form.data.remove_image ? t('feed.clear_selection') : t('feed.remove_image')}
+                                </Button>
+                            </div>
                         </div>
+                    )}
 
-                        <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
-                            <span>{t('feed.browse')}</span>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                name="images[]"
-                                accept="image/*"
-                                multiple
-                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                onChange={handleFileChange}
-                            />
-                        </label>
-
-                        <InputError message={form.errors.images} />
-
-                        <div className="flex items-center justify-end">
-                            <Button
-                                type="button"
-                                variant={form.data.remove_image ? 'destructive' : 'outline'}
-                                size="sm"
-                                onClick={handleRemoveImage}
-                            >
-                                {form.data.remove_image ? t('feed.clear_selection') : t('feed.remove_image')}
-                            </Button>
-                        </div>
-                    </div>
-
-                    {visiblePreviewUrls.length > 0 && (
+                    {!isSharePost && visiblePreviewUrls.length > 0 && (
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                             {visiblePreviewUrls.map((url) => (
                                 <div key={url} className="overflow-hidden rounded-xl border border-border">
@@ -1245,7 +1284,7 @@ interface CommentSectionProps {
 function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentSectionProps) {
     const { t } = useI18n();
 
-    // ✅ newest comment on top
+    // âœ… newest comment on top
     const sortedComments = useMemo(() => {
         return [...(comments ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1293,7 +1332,7 @@ function CommentItem({ comment, postId, getInitials }: CommentItemProps) {
     const { t } = useI18n();
     const [replyOpen, setReplyOpen] = useState(false);
 
-    // ✅ newest reply on top
+    // âœ… newest reply on top
     const replies = useMemo(() => {
         return [...(comment.replies ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1414,7 +1453,7 @@ function CommentForm({
         parent_id: parentId ?? null,
     });
 
-    // ✅ remove effect that sets data (avoids lint). Just initialize from prop.
+    // âœ… remove effect that sets data (avoids lint). Just initialize from prop.
     // If parentId changes (switch reply target), we can set it via memo key on CommentForm usage if needed.
     // For safety: set it only when submitting.
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -1489,6 +1528,71 @@ function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogPr
                     </div>
                 </DialogPrimitive.Content>
             </DialogPortal>
+        </Dialog>
+    );
+}
+
+interface ShareDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+    submitting: boolean;
+    disabled?: boolean;
+    error?: string;
+}
+
+function ShareDialog({
+    open,
+    onOpenChange,
+    value,
+    onChange,
+    onSubmit,
+    submitting,
+    disabled,
+    error,
+}: ShareDialogProps) {
+    const { t } = useI18n();
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        onSubmit();
+                    }}
+                    className="space-y-4"
+                >
+                    <DialogHeader>
+                        <DialogTitle>{t('feed.share_dialog_title')}</DialogTitle>
+                        <DialogDescription>{t('feed.share_dialog_description')}</DialogDescription>
+                    </DialogHeader>
+
+                    <textarea
+                        value={value}
+                        onChange={(event) => onChange(event.target.value)}
+                        placeholder={t('feed.share_dialog_placeholder')}
+                        className="min-h-[120px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+                    />
+                    <InputError message={error} />
+
+                    <DialogFooter className="flex flex-row gap-3">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => onOpenChange(false)}
+                            disabled={submitting}
+                        >
+                            {t('common.cancel')}
+                        </Button>
+                        <Button type="submit" disabled={submitting || disabled}>
+                            {submitting ? t('common.loading') : t('feed.share_dialog_action')}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
         </Dialog>
     );
 }
@@ -1661,7 +1765,7 @@ function NotificationFloatingButton({
                                         {notification.message}
                                     </p>
                                     {excerpt && (
-                                        <p className="mt-1 text-xs text-muted-foreground">“{excerpt}”</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">â€œ{excerpt}â€</p>
                                     )}
                                     {notification.created_at && (
                                         <p className="mt-1 text-xs text-muted-foreground">
@@ -1740,7 +1844,7 @@ function formatRelativeTime(value: string): string {
 const URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
 
 function renderLineWithLinks(line: string, index: number): React.ReactNode[] | React.ReactNode {
-    // ✅ reset because /g regex keeps internal cursor between calls
+    // âœ… reset because /g regex keeps internal cursor between calls
     URL_REGEX.lastIndex = 0;
 
     const fragments: React.ReactNode[] = [];
