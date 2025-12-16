@@ -12,6 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('post_shares', function (Blueprint $table) {
+            $table->index('post_id');
+            $table->index('user_id');
+        });
+
+        Schema::table('post_shares', function (Blueprint $table) {
             $table->dropUnique('post_shares_post_id_user_id_unique');
         });
     }
@@ -22,6 +27,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('post_shares', function (Blueprint $table) {
+            $table->dropIndex(['post_id']);
+            $table->dropIndex(['user_id']);
             $table->unique(['post_id', 'user_id']);
         });
     }
