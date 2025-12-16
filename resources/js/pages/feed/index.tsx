@@ -1,4 +1,4 @@
-﻿import InputError from '@/components/input-error';
+import InputError from '@/components/input-error';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1043,7 +1043,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    // âœ… refs for previews (no setState in useEffect)
+    // ✅ refs for previews (no setState in useEffect)
     const previewBlobRef = useRef<string[]>([]);
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
     const [, rerender] = useState(0);
@@ -1054,8 +1054,8 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         previewBlobRef.current = [];
     };
 
-    // âœ… keep this effect only for cleaning external resources (blob urls) + resetting input
-    // âœ… NO setState here
+    // ✅ keep this effect only for cleaning external resources (blob urls) + resetting input
+    // ✅ NO setState here
     useEffect(() => {
         // reset form fields when switching post or opening dialog
         setData({
@@ -1282,7 +1282,7 @@ interface CommentSectionProps {
 function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentSectionProps) {
     const { t } = useI18n();
 
-    // âœ… newest comment on top
+    // ✅ newest comment on top
     const sortedComments = useMemo(() => {
         return [...(comments ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1330,7 +1330,7 @@ function CommentItem({ comment, postId, getInitials }: CommentItemProps) {
     const { t } = useI18n();
     const [replyOpen, setReplyOpen] = useState(false);
 
-    // âœ… newest reply on top
+    // ✅ newest reply on top
     const replies = useMemo(() => {
         return [...(comment.replies ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1451,7 +1451,7 @@ function CommentForm({
         parent_id: parentId ?? null,
     });
 
-    // âœ… remove effect that sets data (avoids lint). Just initialize from prop.
+    // ✅ remove effect that sets data (avoids lint). Just initialize from prop.
     // If parentId changes (switch reply target), we can set it via memo key on CommentForm usage if needed.
     // For safety: set it only when submitting.
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -1761,7 +1761,7 @@ function NotificationFloatingButton({
                                         {notification.message}
                                     </p>
                                     {excerpt && (
-                                        <p className="mt-1 text-xs text-muted-foreground">â€œ{excerpt}â€</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">“{excerpt}”</p>
                                     )}
                                     {notification.created_at && (
                                         <p className="mt-1 text-xs text-muted-foreground">
@@ -1840,7 +1840,7 @@ function formatRelativeTime(value: string): string {
 const URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
 
 function renderLineWithLinks(line: string, index: number): React.ReactNode[] | React.ReactNode {
-    // âœ… reset because /g regex keeps internal cursor between calls
+    // ✅ reset because /g regex keeps internal cursor between calls
     URL_REGEX.lastIndex = 0;
 
     const fragments: React.ReactNode[] = [];
@@ -1872,3 +1872,4 @@ function renderLineWithLinks(line: string, index: number): React.ReactNode[] | R
 
     return fragments.length === 0 ? line : fragments;
 }
+

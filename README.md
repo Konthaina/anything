@@ -38,6 +38,16 @@ Set `APP_NAME`, `APP_URL`, and DB creds in `.env`.
 - Production build  
   `npm run build`
 
+## Reverb
+- Generate local Reverb credentials:
+```bash
+php -r "echo 'REVERB_APP_ID=local-app'.PHP_EOL.'REVERB_APP_KEY='.bin2hex(random_bytes(16)).PHP_EOL.'REVERB_APP_SECRET='.bin2hex(random_bytes(32)).PHP_EOL;"
+```
+- Start Reverb:
+```bash
+php artisan reverb:start
+```
+
 ## Lint / Test
 ```bash
 npm run lint
