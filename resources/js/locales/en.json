@@ -203,7 +203,7 @@
         }
     },
     "welcome": {
-        "title": "Anything Starter",
+        "title": "Welcome",
         "subtitle": "The modern Laravel + React starter kit",
         "hero_title": "Build",
         "hero_highlight": "Anything",
