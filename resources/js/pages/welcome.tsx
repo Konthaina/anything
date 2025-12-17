@@ -109,27 +109,6 @@ export default function Welcome({ canRegister = true }: { canRegister?: boolean 
                                 <LanguageSwitcher size="sm" />
                                 <AppearanceDropdown />
                             </div>
-                            {auth.user ? (
-                                <Link href={dashboard()}>
-                                    <Button size="sm">
-                                        <Zap className="mr-1.5 h-4 w-4" />
-                                        {t('welcome.cta_dashboard')}
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <Link href={login()}>
-                                        <Button variant="ghost" size="sm">
-                                            {t('welcome.cta_login')}
-                                        </Button>
-                                    </Link>
-                                    {canRegister && (
-                                        <Link href={register()}>
-                                            <Button size="sm">{t('welcome.cta_register')}</Button>
-                                        </Link>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </nav>
@@ -170,18 +149,28 @@ export default function Welcome({ canRegister = true }: { canRegister?: boolean 
                                                 </Button>
                                             </Link>
                                         )}
-                                        <a href="https://github.com/Konthaina/anything" target="_blank" rel="noreferrer">
+                                        <Link href={login()}>
                                             <Button
                                                 variant="outline"
                                                 size="lg"
                                                 className="h-12 min-w-[180px]"
                                             >
-                                                <Code2 className="mr-2 h-4 w-4" />
-                                                {t('welcome.cta_github')}
+                                                <Zap className="mr-2 h-4 w-4" />
+                                                {t('welcome.cta_login')}
                                             </Button>
-                                        </a>
+                                        </Link>
                                     </>
                                 )}
+                                <a href="https://github.com/Konthaina/anything" target="_blank" rel="noreferrer">
+                                    <Button
+                                        variant="outline"
+                                        size="lg"
+                                        className="h-12 min-w-[180px]"
+                                    >
+                                        <Code2 className="mr-2 h-4 w-4" />
+                                        {t('welcome.cta_github')}
+                                    </Button>
+                                </a>
                             </div>
                         </div>
                     </section>
