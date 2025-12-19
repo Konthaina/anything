@@ -30,6 +30,8 @@ import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     ArrowUp,
     Bell,
+    ChevronLeft,
+    ChevronRight,
     Edit3,
     Globe2,
     Heart,
@@ -38,6 +40,9 @@ import {
     MoreHorizontal,
     Share2,
     Trash2,
+    X,
+    ZoomIn,
+    ZoomOut,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -617,10 +622,12 @@ function PostCard({
     const [hiddenImages, setHiddenImages] = useState<string[]>([]);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+    const [lightboxState, setLightboxState] = useState<{
+        images: string[];
+        index: number;
+    } | null>(null);
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
-    // ✅ optimistic like (no syncing effect)
     const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
     const [optimisticLikesCount, setOptimisticLikesCount] = useState<number | null>(null);
     const [liveLikesCount, setLiveLikesCount] = useState(post.likes_count ?? 0);
@@ -650,6 +657,12 @@ function PostCard({
     const sharedPost = post.shared_post ?? null;
     const contentLines = useMemo(() => (post.content ?? '').split('\n'), [post.content]);
     const hasContent = contentLines.some((line) => line.trim().length > 0);
+    const openLightbox = useCallback((images: string[], index: number) => {
+        if (images.length === 0) return;
+
+        const safeIndex = Math.min(Math.max(index, 0), images.length - 1);
+        setLightboxState({ images, index: safeIndex });
+    }, []);
 
     const mergeIncomingComment = useCallback(
         (incoming?: FeedComment) => {
@@ -890,11 +903,11 @@ function PostCard({
 
                         {visibleImageUrls.length > 0 && (
                             <div className={`grid w-full gap-2 ${imageGridClass}`}>
-                                {visibleImageUrls.map((url) => (
+                                {visibleImageUrls.map((url, index) => (
                                     <button
                                         key={url}
                                         type="button"
-                                        onClick={() => setLightboxImage(url)}
+                                        onClick={() => openLightbox(visibleImageUrls, index)}
                                         className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
                                     >
                                         <img
@@ -915,7 +928,7 @@ function PostCard({
                         <SharedPostPreview
                             post={sharedPost}
                             getInitials={getInitials}
-                            onImageClick={setLightboxImage}
+                            onImageClick={openLightbox}
                         />
                     </>
                 ) : (
@@ -926,11 +939,11 @@ function PostCard({
 
                         {visibleImageUrls.length > 0 && (
                             <div className={`grid w-full gap-2 ${imageGridClass}`}>
-                                {visibleImageUrls.map((url) => (
+                                {visibleImageUrls.map((url, index) => (
                                     <button
                                         key={url}
                                         type="button"
-                                        onClick={() => setLightboxImage(url)}
+                                        onClick={() => openLightbox(visibleImageUrls, index)}
                                         className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
                                     >
                                         <img
@@ -1015,10 +1028,11 @@ function PostCard({
             />
 
             <ImageViewerDialog
-                imageUrl={lightboxImage}
-                open={Boolean(lightboxImage)}
+                images={lightboxState?.images ?? []}
+                startIndex={lightboxState?.index ?? 0}
+                open={Boolean(lightboxState)}
                 onOpenChange={(open) => {
-                    if (!open) setLightboxImage(null);
+                    if (!open) setLightboxState(null);
                 }}
             />
         </Card>
@@ -1043,7 +1057,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { setData, clearErrors } = form;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    // ✅ refs for previews (no setState in useEffect)
     const previewBlobRef = useRef<string[]>([]);
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
     const [, rerender] = useState(0);
@@ -1054,8 +1067,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         previewBlobRef.current = [];
     };
 
-    // ✅ keep this effect only for cleaning external resources (blob urls) + resetting input
-    // ✅ NO setState here
     useEffect(() => {
         // reset form fields when switching post or opening dialog
         setData({
@@ -1282,7 +1293,6 @@ interface CommentSectionProps {
 function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentSectionProps) {
     const { t } = useI18n();
 
-    // ✅ newest comment on top
     const sortedComments = useMemo(() => {
         return [...(comments ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1330,7 +1340,6 @@ function CommentItem({ comment, postId, getInitials }: CommentItemProps) {
     const { t } = useI18n();
     const [replyOpen, setReplyOpen] = useState(false);
 
-    // ✅ newest reply on top
     const replies = useMemo(() => {
         return [...(comment.replies ?? [])].sort((a, b) => {
             const at = new Date(a.created_at ?? 0).getTime();
@@ -1451,9 +1460,6 @@ function CommentForm({
         parent_id: parentId ?? null,
     });
 
-    // ✅ remove effect that sets data (avoids lint). Just initialize from prop.
-    // If parentId changes (switch reply target), we can set it via memo key on CommentForm usage if needed.
-    // For safety: set it only when submitting.
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
@@ -1498,31 +1504,282 @@ function CommentForm({
 }
 
 interface ImageViewerDialogProps {
-    imageUrl: string | null;
+    images: string[];
+    startIndex: number;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-function ImageViewerDialog({ imageUrl, open, onOpenChange }: ImageViewerDialogProps) {
+function ImageViewerDialog({
+    images,
+    startIndex,
+    open,
+    onOpenChange,
+}: ImageViewerDialogProps) {
     const { t } = useI18n();
+    const [currentIndex, setCurrentIndex] = useState(startIndex);
+    const [zoom, setZoom] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const panStartRef = useRef({ x: 0, y: 0 });
+    const offsetStartRef = useRef({ x: 0, y: 0 });
+    const isPanningRef = useRef(false);
+    const hasMovedRef = useRef(false);
+    const ignoreClickRef = useRef(false);
+    const minZoom = 1;
+    const maxZoom = 3;
+    const step = 0.25;
+    const clickZoom = 2;
+    const maxIndex = Math.max(0, images.length - 1);
+    const safeIndex = Math.min(Math.max(startIndex, 0), maxIndex);
 
-    if (!imageUrl) return null;
+    const clampOffset = useCallback(
+        (nextOffset: { x: number; y: number }, nextZoom: number) => {
+            if (nextZoom <= minZoom) {
+                return { x: 0, y: 0 };
+            }
+
+            const container = containerRef.current;
+            if (!container) {
+                return nextOffset;
+            }
+
+            const rect = container.getBoundingClientRect();
+            const maxOffsetX = Math.max(0, ((nextZoom - 1) * rect.width) / 2);
+            const maxOffsetY = Math.max(0, ((nextZoom - 1) * rect.height) / 2);
+
+            return {
+                x: Math.min(Math.max(nextOffset.x, -maxOffsetX), maxOffsetX),
+                y: Math.min(Math.max(nextOffset.y, -maxOffsetY), maxOffsetY),
+            };
+        },
+        [minZoom],
+    );
+
+    useEffect(() => {
+        if (!open) return;
+        setCurrentIndex(safeIndex);
+        setZoom(minZoom);
+        setOffset({ x: 0, y: 0 });
+        hasMovedRef.current = false;
+        ignoreClickRef.current = false;
+    }, [open, safeIndex, images.length, minZoom]);
+
+    useEffect(() => {
+        if (!open) return;
+        setZoom(minZoom);
+        setOffset({ x: 0, y: 0 });
+        hasMovedRef.current = false;
+        ignoreClickRef.current = false;
+    }, [currentIndex, open, minZoom]);
+
+    useEffect(() => {
+        if (!open) return;
+        setOffset((prev) => clampOffset(prev, zoom));
+        if (zoom <= minZoom) {
+            hasMovedRef.current = false;
+            ignoreClickRef.current = false;
+        }
+    }, [zoom, open, clampOffset, minZoom]);
+
+    if (!open || images.length === 0) return null;
+
+    const zoomPercent = Math.round(zoom * 100);
+    const canNavigate = images.length > 1;
+    const currentImage = images[currentIndex] ?? images[0];
+
+    const handlePrev = () => {
+        if (!canNavigate) return;
+        setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    };
+
+    const handleNext = () => {
+        if (!canNavigate) return;
+        setCurrentIndex((prev) => (prev + 1) % images.length);
+    };
+
+    const handleZoomIn = () => {
+        setZoom((prev) => Math.min(maxZoom, Number((prev + step).toFixed(2))));
+    };
+
+    const handleZoomOut = () => {
+        setZoom((prev) => Math.max(minZoom, Number((prev - step).toFixed(2))));
+    };
+
+    const handleResetZoom = () => {
+        setZoom(minZoom);
+    };
+
+    const handleImageClick = () => {
+        if (ignoreClickRef.current) {
+            ignoreClickRef.current = false;
+            return;
+        }
+
+        setZoom((prev) => (prev === minZoom ? Math.min(clickZoom, maxZoom) : minZoom));
+    };
+
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (zoom <= minZoom || event.button !== 0) return;
+
+        event.preventDefault();
+        isPanningRef.current = true;
+        setIsPanning(true);
+        hasMovedRef.current = false;
+        panStartRef.current = { x: event.clientX, y: event.clientY };
+        offsetStartRef.current = offset;
+        event.currentTarget.setPointerCapture(event.pointerId);
+    };
+
+    const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (!isPanningRef.current) return;
+
+        event.preventDefault();
+        const dx = event.clientX - panStartRef.current.x;
+        const dy = event.clientY - panStartRef.current.y;
+
+        if (!hasMovedRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+            hasMovedRef.current = true;
+        }
+
+        const nextOffset = {
+            x: offsetStartRef.current.x + dx,
+            y: offsetStartRef.current.y + dy,
+        };
+
+        setOffset(clampOffset(nextOffset, zoom));
+    };
+
+    const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (!isPanningRef.current) return;
+
+        isPanningRef.current = false;
+        setIsPanning(false);
+        if (hasMovedRef.current) {
+            ignoreClickRef.current = true;
+            hasMovedRef.current = false;
+        }
+        event.currentTarget.releasePointerCapture(event.pointerId);
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
                 <DialogOverlay className="bg-black/80" />
-                <DialogPrimitive.Content className="fixed inset-x-4 top-[50%] z-50 max-h-[90vh] w-auto translate-y-[-50%] transform rounded-3xl bg-transparent p-0 shadow-none">
+                <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-stretch justify-center p-3 sm:items-center sm:p-4">
                     <DialogPrimitive.Title className="sr-only">{t('feed.view_image')}</DialogPrimitive.Title>
                     <DialogPrimitive.Description className="sr-only">
                         {t('feed.view_image_description')}
                     </DialogPrimitive.Description>
-                    <div className="flex items-center justify-center">
-                        <img
-                            src={imageUrl}
-                            alt={t('feed.view_image')}
-                            className="max-h-[90vh] w-full object-contain"
-                        />
+                    <div className="flex h-full w-full max-w-5xl flex-col gap-3 sm:h-auto sm:max-h-[90svh]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-white">
+                            <div className="font-semibold uppercase tracking-wide">
+                                {canNavigate
+                                    ? `${currentIndex + 1} / ${images.length}`
+                                    : t('feed.view_image')}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleZoomOut}
+                                    disabled={zoom <= minZoom}
+                                    className="text-white hover:bg-white/10"
+                                    aria-label={t('common.zoom_out')}
+                                >
+                                    <ZoomOut className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleZoomIn}
+                                    disabled={zoom >= maxZoom}
+                                    className="text-white hover:bg-white/10"
+                                    aria-label={t('common.zoom_in')}
+                                >
+                                    <ZoomIn className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleResetZoom}
+                                    disabled={zoom === minZoom}
+                                    className="h-8 px-2 text-xs font-semibold text-white hover:bg-white/10"
+                                    aria-label={t('common.reset_zoom')}
+                                >
+                                    {zoomPercent}%
+                                </Button>
+                                <DialogClose asChild>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-white hover:bg-white/10"
+                                        aria-label={t('common.close')}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </DialogClose>
+                            </div>
+                        </div>
+
+                        <div className="relative flex-1 min-h-0">
+                            <div
+                                ref={containerRef}
+                                className="flex h-full w-full min-h-0 items-center justify-center overflow-hidden touch-none sm:min-h-[60vh]"
+                                onPointerDown={handlePointerDown}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerEnd}
+                                onPointerCancel={handlePointerEnd}
+                            >
+                                <img
+                                    src={currentImage}
+                                    alt={t('feed.view_image')}
+                                    className={cn(
+                                        'h-auto max-h-full max-w-full select-none object-contain will-change-transform',
+                                        isPanning ? 'transition-none' : 'transition-transform duration-200 ease-out',
+                                        zoom === minZoom
+                                            ? 'cursor-zoom-in'
+                                            : isPanning
+                                                ? 'cursor-grabbing'
+                                                : 'cursor-grab',
+                                    )}
+                                    style={{
+                                        transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom})`,
+                                    }}
+                                    onClick={handleImageClick}
+                                    draggable={false}
+                                />
+                            </div>
+                            {canNavigate && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handlePrev}
+                                        aria-label={t('common.previous')}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 text-white hover:bg-black/80"
+                                    >
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleNext}
+                                        aria-label={t('common.next')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 text-white hover:bg-black/80"
+                                    >
+                                        <ChevronRight className="h-5 w-5" />
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </DialogPrimitive.Content>
             </DialogPortal>
@@ -1600,7 +1857,7 @@ function SharedPostPreview({
 }: {
     post: FeedPost;
     getInitials: (value?: string | null) => string;
-    onImageClick: (url: string) => void;
+    onImageClick: (images: string[], index: number) => void;
 }) {
     const [hiddenImages, setHiddenImages] = useState<string[]>([]);
     const sanitizedImages = useMemo(
@@ -1634,13 +1891,13 @@ function SharedPostPreview({
 
             {sanitizedImages.length > 0 && (
                 <div className={`grid w-full gap-2 ${imageGridClass}`}>
-                    {sanitizedImages.map((url) => (
-                        <button
-                            key={url}
-                            type="button"
-                            onClick={() => onImageClick(url)}
-                            className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
-                        >
+                {sanitizedImages.map((url, index) => (
+                    <button
+                        key={url}
+                        type="button"
+                        onClick={() => onImageClick(sanitizedImages, index)}
+                        className="group overflow-hidden rounded-2xl border border-border transition hover:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                    >
                             <img
                                 src={url}
                                 alt=""
@@ -1840,7 +2097,6 @@ function formatRelativeTime(value: string): string {
 const URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
 
 function renderLineWithLinks(line: string, index: number): React.ReactNode[] | React.ReactNode {
-    // ✅ reset because /g regex keeps internal cursor between calls
     URL_REGEX.lastIndex = 0;
 
     const fragments: React.ReactNode[] = [];

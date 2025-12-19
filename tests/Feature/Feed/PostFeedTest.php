@@ -5,11 +5,32 @@ use App\Events\PostDeleted;
 use App\Events\PostShared;
 use App\Events\PostUpdated;
 use App\Models\Post;
-use App\Models\User;
 use App\Models\PostShare;
+use App\Models\User;
 use App\Notifications\PostSharedNotification;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+
+it('renders the feed page with image urls', function () {
+    $user = User::factory()->create();
+    $post = Post::factory()->for($user)->create([
+        'image_paths' => ['posts/example.png', 'posts/example-two.png'],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('feed.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('feed/index')
+            ->has('posts', 1)
+            ->where('posts.0.id', $post->id)
+            ->has('posts.0.image_urls', 2)
+            ->where('posts.0.image_urls.0', Storage::disk('public')->url('posts/example.png'))
+            ->where('posts.0.image_urls.1', Storage::disk('public')->url('posts/example-two.png'))
+        );
+});
 
 it('broadcasts a PostCreated event when a user creates a post', function () {
     Event::fake([PostCreated::class]);

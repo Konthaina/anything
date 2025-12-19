@@ -37,6 +37,9 @@
         "try_again": "Try again",
         "apply": "Apply",
         "clear": "Clear",
+        "zoom_in": "Zoom in",
+        "zoom_out": "Zoom out",
+        "reset_zoom": "Reset zoom",
         "not_available": "N/A"
     },
     "nav": {
