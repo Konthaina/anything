@@ -21,7 +21,7 @@ import { follow, show as showProfile, unfollow } from '@/routes/profiles';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
 import { useI18n } from '@/contexts/language-context';
-import { Github, Pencil } from 'lucide-react';
+import { BadgeCheck, Github, Pencil } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { getEchoInstance } from '@/lib/echo-client';
 
@@ -32,6 +32,7 @@ interface ProfileUser {
     cover?: string | null;
     bio?: string | null;
     github_url?: string | null;
+    is_verified?: boolean;
     created_at?: string | null;
     updated_at?: string | null;
     posts_count?: number;
@@ -343,9 +344,17 @@ export default function ProfileShow() {
                                                         />
                                                     </label>
                                                     <div className="space-y-1">
-                                                        <CardTitle className="text-xl font-semibold">
-                                                            {profileUser.name}
-                                                        </CardTitle>
+                                                        <div className="flex items-center gap-2">
+                                                            <CardTitle className="text-xl font-semibold">
+                                                                {profileUser.name}
+                                                            </CardTitle>
+                                                            {profileUser.is_verified && (
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                                                    <BadgeCheck className="h-3.5 w-3.5" />
+                                                                    {t('profile_page.verified')}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         {profileUser.created_at && (
                                                             <p className="text-xs text-muted-foreground">
                                                                 {t('profile_page.joined', {
@@ -530,9 +539,17 @@ export default function ProfileShow() {
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="space-y-1">
-                                                <CardTitle className="text-xl font-semibold">
-                                                    {profileUser.name}
-                                                </CardTitle>
+                                                <div className="flex items-center gap-2">
+                                                    <CardTitle className="text-xl font-semibold">
+                                                        {profileUser.name}
+                                                    </CardTitle>
+                                                    {profileUser.is_verified && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                                            <BadgeCheck className="h-3.5 w-3.5" />
+                                                            {t('profile_page.verified')}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {profileUser.created_at && (
                                                     <p className="text-xs text-muted-foreground">
                                                         {t('profile_page.joined', {

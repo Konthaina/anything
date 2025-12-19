@@ -150,6 +150,7 @@
         "github_label": "GitHub",
         "github_placeholder": "https://github.com/username",
         "github_empty": "បន្ថែមតំណ GitHub",
+        "verified": "បានផ្ទៀងផ្ទាត់",
         "empty": "មិនទាន់មានប្រកាសទេ។",
         "joined": "បានចូលរួម {date}"
     },
@@ -249,24 +250,7 @@
         "feature_realtime_title": "ត្រៀមសម្រាប់ Real-time",
         "feature_realtime_desc": "ភ្ជាប់ Laravel Reverb ជាមួយ Echo សម្រាប់ WebSocket និង live updates។",
         "feature_deployment_title": "Deploy បានគ្រប់ទីកន្លែង",
-        "feature_deployment_desc": "អាចដាក់ដំណើរការជាមួយ Laravel Cloud, Forge, Vapor ឬ hosting PHP ណាមួយ។ មាន SSR support រួចរាល់។",
-        "headline": "ចាប់ផ្តើមគម្រោងរបស់អ្នក",
-        "intro": "Laravel មានបរិយាកាសសម្បូរបែប។ យើងស្នើឲ្យចាប់ផ្តើមដោយរឿងទាំងនេះ។",
-        "steps": [
-            "អានឯកសារ",
-            "មើលវីដេអូបង្រៀនលើ Laracasts",
-            "ចាប់ផ្តើមគម្រោងដំបូងរបស់អ្នក"
-        ],
-        "features_title_legacy": "អ្វីដែលអ្នកទទួលបាន",
-        "feature_one_title": "ការចូលប្រើ និងប្រវត្តិរូប",
-        "feature_one_body": "ការផ្ទៀងផ្ទាត់សុវត្ថិភាព ជាមួយអ៊ីមែល បង្កើត/កំណត់ពាក្យសម្ងាត់ និងគ្រប់គ្រងប្រវត្តិរូប។",
-        "feature_two_title": "រចនាសម្ព័ន្ធស្អាត",
-        "feature_two_body": "ធាតុ UI ស្អាត ដោយ Tailwind CSS និង shadcn/ui ដើម្បីឲ្យអ្នកធ្វើការរហ័ស។",
-        "feature_three_title": "បទពិសោធន៍អ្នកអភិវឌ្ឍ",
-        "feature_three_body": "TypeScript, Vite, Inertia និងឧបករណ៍ល្អៗ ផ្តល់អ្វីៗដែលអ្នកត្រូវការ។",
-        "hero_button": "ចូលទៅកាន់ផ្ទាំងគ្រប់គ្រង",
-        "hero_secondary": "មើលឯកសារ",
-        "deploy_now": "ដាក់ឲ្យដំណើរការ​ឥឡូវនេះ"
+        "feature_deployment_desc": "អាចដាក់ដំណើរការជាមួយ Laravel Cloud, Forge, Vapor ឬ hosting PHP ណាមួយ។ មាន SSR support រួចរាល់។"
     },
     "admin": {
         "breadcrumb": "គ្រប់គ្រងអ្នកប្រើ",
@@ -280,6 +264,7 @@
         "table": {
             "no_role": "គ្មានតួនាទី",
             "password_hint": "ពាក្យសម្ងាត់ (ទុកទំនេរដើម្បីរក្សាទុកដដែល)",
+            "verified": "បានផ្ទៀងផ្ទាត់",
             "save_user": "រក្សាទុកអ្នកប្រើ",
             "delete_user": "លុបអ្នកប្រើ",
             "delete_user_title": "លុបអ្នកប្រើ",
@@ -361,4 +346,3 @@
         "scroll_to_top": "រុញទៅលើ"
     }
 }
-

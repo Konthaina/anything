@@ -15,15 +15,15 @@ class FeedPostPresenter
         $sharedLookup = $lookups['shared'] ?? [];
 
         $post->loadMissing([
-            'user:id,name,email,avatar_path',
-            'sharedPost.user:id,name,email,avatar_path',
+            'user:id,name,email,avatar_path,is_verified',
+            'sharedPost.user:id,name,email,avatar_path,is_verified',
             'rootComments' => static function (HasMany $query): void {
                 $query
                     ->with([
-                        'user:id,name,email,avatar_path',
+                        'user:id,name,email,avatar_path,is_verified',
                         'replies' => static function (HasMany $replyQuery): void {
                             $replyQuery
-                                ->with('user:id,name,email,avatar_path')
+                                ->with('user:id,name,email,avatar_path,is_verified')
                                 ->orderBy('created_at');
                         },
                     ])
@@ -49,6 +49,7 @@ class FeedPostPresenter
                 'name' => $post->user->name,
                 'email' => $post->user->email,
                 'avatar' => $post->user->avatar,
+                'is_verified' => (bool) $post->user->is_verified,
             ],
             'liked' => (bool) ($likedLookup[$post->id] ?? false),
             'shared' => (bool) ($sharedLookup[$post->id] ?? false),

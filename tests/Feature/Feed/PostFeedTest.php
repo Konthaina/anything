@@ -21,6 +21,7 @@ it('renders the feed page with image urls', function () {
         'visibility' => 'public',
     ]);
 
+    $user->forceFill(['is_verified' => true])->save();
     $user->following()->attach($followed->id);
 
     $this->actingAs($user)
@@ -33,6 +34,7 @@ it('renders the feed page with image urls', function () {
             ->has('posts.data', 1)
             ->where('posts.data.0.id', $post->id)
             ->where('posts.data.0.visibility', 'public')
+            ->where('posts.data.0.user.is_verified', true)
             ->has('posts.data.0.image_urls', 2)
             ->where('posts.data.0.image_urls.0', Storage::disk('public')->url('posts/example.png'))
             ->where('posts.data.0.image_urls.1', Storage::disk('public')->url('posts/example-two.png'))

@@ -9,6 +9,7 @@ it('shows a user profile with their posts', function () {
     $profileUser = User::factory()->create([
         'bio' => 'Loves building Laravel apps.',
         'github_url' => 'https://github.com/laravel',
+        'is_verified' => true,
     ]);
     $follower = User::factory()->create();
     $followed = User::factory()->create();
@@ -30,6 +31,7 @@ it('shows a user profile with their posts', function () {
             ->where('profile_user.name', $profileUser->name)
             ->where('profile_user.bio', $profileUser->bio)
             ->where('profile_user.github_url', $profileUser->github_url)
+            ->where('profile_user.is_verified', true)
             ->where('profile_user.posts_count', 1)
             ->where('profile_user.followers_count', 1)
             ->where('profile_user.following_count', 1)

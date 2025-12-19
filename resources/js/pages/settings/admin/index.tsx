@@ -22,6 +22,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/contexts/language-context';
 import { type BreadcrumbItem, type SharedData } from '@/types';
+import { BadgeCheck } from 'lucide-react';
 
 interface Role {
     id: number;
@@ -42,6 +43,7 @@ interface UserWithRoles {
     email: string;
     avatar?: string | null;
     updated_at?: string | null;
+    is_verified?: boolean;
     roles: Role[];
 }
 
@@ -256,6 +258,7 @@ function UserRow({
     const [name, setName] = useState(() => user.name);
     const [email, setEmail] = useState(() => user.email);
     const [password, setPassword] = useState('');
+    const [isVerified, setIsVerified] = useState(() => Boolean(user.is_verified));
     const [showConfirm, setShowConfirm] = useState(false);
     const { t } = useI18n();
 
@@ -283,8 +286,16 @@ function UserRow({
                         {initials}
                     </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-foreground">{user.name}</span>
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-foreground">{user.name}</span>
+                        {user.is_verified && (
+                            <Badge variant="secondary" className="gap-1 text-[11px]">
+                                <BadgeCheck className="h-3.5 w-3.5" />
+                                {t('admin.table.verified')}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
             </div>
             <div className="col-span-3 text-sm text-muted-foreground">{user.email}</div>
@@ -314,10 +325,19 @@ function UserRow({
             {isEditing && (
                 <div className="col-span-12 mt-3 rounded-md bg-background p-4 shadow-sm">
                     <div className="flex flex-col gap-4">
-                        <Form method="post" action={updateAction} data={{ name, email, password }}>
+                        <Form
+                            method="post"
+                            action={updateAction}
+                            data={{ name, email, password, is_verified: isVerified }}
+                        >
                             {({ setData: setUpdateData, processing: updating, errors: updateErrors }) => (
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <input type="hidden" name="_method" value="PATCH" />
+                                    <input
+                                        type="hidden"
+                                        name="is_verified"
+                                        value={isVerified ? '1' : '0'}
+                                    />
                                     <div className="grid gap-1">
                                         <Label className="text-xs text-muted-foreground">
                                             {t('common.name')}
@@ -363,6 +383,23 @@ function UserRow({
                                             placeholder={t('admin.create_user.password_placeholder')}
                                         />
                                         <InputError message={updateErrors.password} />
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:col-span-3">
+                                        <Checkbox
+                                            id={`verified-${user.id}`}
+                                            checked={isVerified}
+                                            onCheckedChange={(checked) => {
+                                                const next = checked === true;
+                                                setIsVerified(next);
+                                                setUpdateData('is_verified', next);
+                                            }}
+                                        />
+                                        <Label
+                                            htmlFor={`verified-${user.id}`}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            {t('admin.table.verified')}
+                                        </Label>
                                     </div>
                                     <div className="sm:col-span-3 flex gap-2">
                                         <Button size="sm" disabled={updating} type="submit">

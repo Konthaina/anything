@@ -147,6 +147,7 @@
         "github_label": "GitHub",
         "github_placeholder": "https://github.com/username",
         "github_empty": "Add your GitHub profile link",
+        "verified": "Verified",
         "unfollow_title": "Unfollow {name}",
         "unfollow_description": "Stop following {name}? You can follow them again later.",
         "unfollow_confirm": "Unfollow {name}",
@@ -263,6 +264,7 @@
         "table": {
             "no_role": "No role",
             "password_hint": "Password (leave blank to keep)",
+            "verified": "Verified",
             "save_user": "Save user",
             "delete_user": "Delete user",
             "delete_user_title": "Delete user",

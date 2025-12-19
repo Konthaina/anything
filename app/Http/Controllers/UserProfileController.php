@@ -32,15 +32,15 @@ class UserProfileController extends Controller
                 $query->where('visibility', 'public');
             })
             ->with([
-                'user:id,name,email,avatar_path',
-                'sharedPost.user:id,name,email,avatar_path',
+                'user:id,name,email,avatar_path,is_verified',
+                'sharedPost.user:id,name,email,avatar_path,is_verified',
                 'rootComments' => function ($query) {
                     $query
                         ->with([
-                            'user:id,name,email,avatar_path',
+                            'user:id,name,email,avatar_path,is_verified',
                             'replies' => function ($replyQuery) {
                                 $replyQuery
-                                    ->with('user:id,name,email,avatar_path')
+                                    ->with('user:id,name,email,avatar_path,is_verified')
                                     ->orderBy('created_at');
                             },
                         ])
@@ -92,6 +92,7 @@ class UserProfileController extends Controller
                 'cover' => $user->cover,
                 'bio' => $user->bio,
                 'github_url' => $user->github_url,
+                'is_verified' => (bool) $user->is_verified,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'posts_count' => $postsCount,

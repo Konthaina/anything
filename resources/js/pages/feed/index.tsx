@@ -30,6 +30,7 @@ import { type AppNotification, type BreadcrumbItem, type SharedData } from '@/ty
 import { Form, Head, Link, router, useForm, usePage, WhenVisible } from '@inertiajs/react';
 import {
     ArrowUp,
+    BadgeCheck,
     Bell,
     ChevronDown,
     ChevronLeft,
@@ -54,6 +55,7 @@ export interface FeedUser {
     name: string;
     email: string;
     avatar?: string | null;
+    is_verified?: boolean;
 }
 
 export interface FeedPost {
@@ -1120,7 +1122,14 @@ export function PostCard({
                     </Avatar>
 
                     <div className="flex flex-col">
-                        <div className="text-sm font-semibold leading-tight">{post.user.name}</div>
+                        <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold leading-tight">{post.user.name}</div>
+                            {post.user.is_verified && (
+                                <span className="inline-flex items-center justify-center rounded-full bg-sky-100 p-1 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                    <BadgeCheck className="h-3.5 w-3.5" />
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <span>{timestamp}</span>
                             <span className="text-muted-foreground/60">-</span>

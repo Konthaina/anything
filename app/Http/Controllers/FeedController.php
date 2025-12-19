@@ -53,15 +53,15 @@ class FeedController extends Controller
                 });
             })
             ->with([
-                'user:id,name,email,avatar_path',
-                'sharedPost.user:id,name,email,avatar_path',
+                'user:id,name,email,avatar_path,is_verified',
+                'sharedPost.user:id,name,email,avatar_path,is_verified',
                 'rootComments' => function ($query) {
                     $query
                         ->with([
-                            'user:id,name,email,avatar_path',
+                            'user:id,name,email,avatar_path,is_verified',
                             'replies' => function ($replyQuery) {
                                 $replyQuery
-                                    ->with('user:id,name,email,avatar_path')
+                                    ->with('user:id,name,email,avatar_path,is_verified')
                                     ->orderBy('created_at');
                             },
                         ])
@@ -204,7 +204,10 @@ class FeedController extends Controller
         if ($resharingSharedPost) {
             $post->refresh();
         }
-        $sharedPost->load('user:id,name,email,avatar_path', 'sharedPost.user:id,name,email,avatar_path');
+        $sharedPost->load(
+            'user:id,name,email,avatar_path,is_verified',
+            'sharedPost.user:id,name,email,avatar_path,is_verified',
+        );
 
         event(new PostCreated($sharedPost));
         event(new PostShared($shareTarget, $user));

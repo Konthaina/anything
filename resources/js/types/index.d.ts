@@ -76,6 +76,7 @@ export interface User {
     cover?: string | null;
     bio?: string | null;
     github_url?: string | null;
+    is_verified?: boolean;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;

@@ -24,7 +24,7 @@ class UserManagementController extends Controller
 
         return Inertia::render('settings/admin/index', [
             'users' => User::query()
-                ->select('id', 'name', 'email', 'avatar_path', 'updated_at')
+                ->select('id', 'name', 'email', 'avatar_path', 'updated_at', 'is_verified')
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($q) use ($search) {
                         $q->where('name', 'like', '%'.$search.'%')
@@ -107,6 +107,7 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
             'password' => ['nullable', 'string', 'min:8'],
+            'is_verified' => ['nullable', 'boolean'],
         ]);
 
         $user->name = $data['name'];
@@ -114,6 +115,10 @@ class UserManagementController extends Controller
 
         if (! empty($data['password'])) {
             $user->password = $data['password'];
+        }
+
+        if (array_key_exists('is_verified', $data)) {
+            $user->is_verified = $data['is_verified'];
         }
 
         $user->save();
