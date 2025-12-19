@@ -91,6 +91,7 @@ class UserProfileController extends Controller
                 'avatar' => $user->avatar,
                 'cover' => $user->cover,
                 'bio' => $user->bio,
+                'github_url' => $user->github_url,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'posts_count' => $postsCount,

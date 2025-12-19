@@ -21,7 +21,7 @@ import { follow, show as showProfile, unfollow } from '@/routes/profiles';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
 import { useI18n } from '@/contexts/language-context';
-import { Pencil } from 'lucide-react';
+import { Github, Pencil } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { getEchoInstance } from '@/lib/echo-client';
 
@@ -31,6 +31,7 @@ interface ProfileUser {
     avatar?: string | null;
     cover?: string | null;
     bio?: string | null;
+    github_url?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
     posts_count?: number;
@@ -97,12 +98,16 @@ export default function ProfileShow() {
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
     const [bioDraft, setBioDraft] = useState<string | null>(null);
     const [isEditingBio, setIsEditingBio] = useState(false);
+    const [githubDraft, setGithubDraft] = useState<string | null>(null);
+    const [isEditingGithub, setIsEditingGithub] = useState(false);
     const isFollowing = Boolean(profileUser.is_following);
     const updatedAt = profileUser.updated_at ?? auth?.user?.updated_at ?? null;
     const hasProfileMediaChanges = Boolean(avatarPreview || coverPreview);
     const hasBioChanges =
         bioDraft !== null && bioDraft !== (profileUser.bio ?? '');
-    const hasProfileChanges = hasProfileMediaChanges || hasBioChanges;
+    const hasGithubChanges =
+        githubDraft !== null && githubDraft !== (profileUser.github_url ?? '');
+    const hasProfileChanges = hasProfileMediaChanges || hasBioChanges || hasGithubChanges;
     const [livePosts, setLivePosts] = useState<FeedPost[]>(postsData);
 
     const resetProfileMediaPreviews = () => {
@@ -120,6 +125,8 @@ export default function ProfileShow() {
         });
         setBioDraft(null);
         setIsEditingBio(false);
+        setGithubDraft(null);
+        setIsEditingGithub(false);
     };
 
     useEffect(() => {
@@ -415,6 +422,63 @@ export default function ProfileShow() {
                                                 )}
                                             </div>
 
+                                            <div className="w-full">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        <Github className="h-3.5 w-3.5" />
+                                                        {t('profile_page.github_label')}
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (isEditingGithub) {
+                                                                setIsEditingGithub(false);
+                                                                setGithubDraft(null);
+                                                                return;
+                                                            }
+
+                                                            setIsEditingGithub(true);
+                                                            setGithubDraft(profileUser.github_url ?? '');
+                                                        }}
+                                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                                        aria-label={t('common.edit')}
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                                {isEditingGithub ? (
+                                                    <>
+                                                        <Input
+                                                            type="url"
+                                                            name="github_url"
+                                                            value={githubDraft ?? ''}
+                                                            onChange={(event) =>
+                                                                setGithubDraft(event.target.value)
+                                                            }
+                                                            placeholder={t('profile_page.github_placeholder')}
+                                                            className="mt-2"
+                                                        />
+                                                        <InputError
+                                                            className="mt-1"
+                                                            message={errors.github_url}
+                                                        />
+                                                    </>
+                                                ) : profileUser.github_url ? (
+                                                    <a
+                                                        href={profileUser.github_url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+                                                    >
+                                                        {profileUser.github_url}
+                                                    </a>
+                                                ) : (
+                                                    <p className="mt-2 text-sm text-muted-foreground">
+                                                        {t('profile_page.github_empty')}
+                                                    </p>
+                                                )}
+                                            </div>
+
                                             <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
                                                 <ProfileStat
                                                     label={t('profile_page.posts')}
@@ -527,6 +591,22 @@ export default function ProfileShow() {
                                             )}
                                         </p>
                                     </div>
+                                    {profileUser.github_url && (
+                                        <div className="w-full">
+                                            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                <Github className="h-3.5 w-3.5" />
+                                                {t('profile_page.github_label')}
+                                            </div>
+                                            <a
+                                                href={profileUser.github_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+                                            >
+                                                {profileUser.github_url}
+                                            </a>
+                                        </div>
+                                    )}
                                     <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
                                         <ProfileStat
                                             label={t('profile_page.posts')}

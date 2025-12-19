@@ -147,6 +147,9 @@
         "bio_label": "Bio",
         "bio_placeholder": "សរសេរពីខ្លួនអ្នក...",
         "bio_limit": "អតិបរមា 500 តួអក្សរ",
+        "github_label": "GitHub",
+        "github_placeholder": "https://github.com/username",
+        "github_empty": "បន្ថែមតំណ GitHub",
         "empty": "មិនទាន់មានប្រកាសទេ។",
         "joined": "បានចូលរួម {date}"
     },

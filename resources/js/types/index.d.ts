@@ -75,6 +75,7 @@ export interface User {
     avatar?: string;
     cover?: string | null;
     bio?: string | null;
+    github_url?: string | null;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;

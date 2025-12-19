@@ -100,6 +100,44 @@ test('user can update their bio', function () {
     expect($user->refresh()->bio)->toBe('Writing about products and code.');
 });
 
+test('user can update their github url', function () {
+    $user = User::factory()->create([
+        'github_url' => null,
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
+        ->patch(route('profile.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'github_url' => 'https://github.com/laravel',
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('profile.edit', absolute: false));
+
+    expect($user->refresh()->github_url)->toBe('https://github.com/laravel');
+});
+
+test('github url must be a github link', function () {
+    $user = User::factory()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
+        ->patch(route('profile.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'github_url' => 'https://example.com/not-github',
+        ]);
+
+    $response
+        ->assertSessionHasErrors('github_url')
+        ->assertRedirect(route('profile.edit', absolute: false));
+});
+
 test('user can delete their account', function () {
     $user = User::factory()->create();
 

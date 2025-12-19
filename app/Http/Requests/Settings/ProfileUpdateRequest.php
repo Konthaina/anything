@@ -31,6 +31,25 @@ class ProfileUpdateRequest extends FormRequest
             'avatar' => ['nullable', 'image', 'max:5120'],
             'cover' => ['nullable', 'image', 'max:5120'],
             'bio' => ['nullable', 'string', 'max:500'],
+            'github_url' => [
+                'nullable',
+                'string',
+                'max:255',
+                'url',
+                'regex:/^https?:\\/\\/(www\\.)?github\\.com(\\/.*)?$/i',
+            ],
+        ];
+    }
+
+    /**
+     * Get the validation messages for the defined rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'github_url.regex' => 'The GitHub URL must be a github.com link.',
         ];
     }
 }
