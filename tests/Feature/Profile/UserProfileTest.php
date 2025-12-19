@@ -6,7 +6,9 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 it('shows a user profile with their posts', function () {
     $viewer = User::factory()->create();
-    $profileUser = User::factory()->create();
+    $profileUser = User::factory()->create([
+        'bio' => 'Loves building Laravel apps.',
+    ]);
     $follower = User::factory()->create();
     $followed = User::factory()->create();
 
@@ -23,6 +25,7 @@ it('shows a user profile with their posts', function () {
             ->component('profiles/show')
             ->where('profile_user.id', $profileUser->id)
             ->where('profile_user.name', $profileUser->name)
+            ->where('profile_user.bio', $profileUser->bio)
             ->where('profile_user.posts_count', 1)
             ->where('profile_user.followers_count', 1)
             ->where('profile_user.following_count', 1)

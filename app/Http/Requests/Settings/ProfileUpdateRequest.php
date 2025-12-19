@@ -30,6 +30,7 @@ class ProfileUpdateRequest extends FormRequest
 
             'avatar' => ['nullable', 'image', 'max:5120'],
             'cover' => ['nullable', 'image', 'max:5120'],
+            'bio' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

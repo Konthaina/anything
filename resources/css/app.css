@@ -143,3 +143,15 @@
         @apply bg-background font-sans text-foreground;
     }
 }
+
+@layer utilities {
+    .no-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+    }
+}

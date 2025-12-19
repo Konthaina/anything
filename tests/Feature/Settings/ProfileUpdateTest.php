@@ -79,6 +79,27 @@ test('user can update their cover image', function () {
     Storage::disk('public')->assertExists($user->cover_path);
 });
 
+test('user can update their bio', function () {
+    $user = User::factory()->create([
+        'bio' => null,
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
+        ->patch(route('profile.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'bio' => 'Writing about products and code.',
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('profile.edit', absolute: false));
+
+    expect($user->refresh()->bio)->toBe('Writing about products and code.');
+});
+
 test('user can delete their account', function () {
     $user = User::factory()->create();
 

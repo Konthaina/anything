@@ -21,14 +21,15 @@ import { follow, show as showProfile, unfollow } from '@/routes/profiles';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
 import { useI18n } from '@/contexts/language-context';
+import { Pencil } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 
 interface ProfileUser {
     id: number;
     name: string;
-    email: string;
     avatar?: string | null;
     cover?: string | null;
+    bio?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
     posts_count?: number;
@@ -87,8 +88,31 @@ export default function ProfileShow() {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [coverPreview, setCoverPreview] = useState<string | null>(null);
+    const [bioDraft, setBioDraft] = useState<string | null>(null);
+    const [isEditingBio, setIsEditingBio] = useState(false);
     const isFollowing = Boolean(profileUser.is_following);
     const updatedAt = profileUser.updated_at ?? auth?.user?.updated_at ?? null;
+    const hasProfileMediaChanges = Boolean(avatarPreview || coverPreview);
+    const hasBioChanges =
+        bioDraft !== null && bioDraft !== (profileUser.bio ?? '');
+    const hasProfileChanges = hasProfileMediaChanges || hasBioChanges;
+
+    const resetProfileMediaPreviews = () => {
+        setAvatarPreview((current) => {
+            if (current) {
+                URL.revokeObjectURL(current);
+            }
+            return null;
+        });
+        setCoverPreview((current) => {
+            if (current) {
+                URL.revokeObjectURL(current);
+            }
+            return null;
+        });
+        setBioDraft(null);
+        setIsEditingBio(false);
+    };
 
     useEffect(() => {
         return () => {
@@ -162,18 +186,7 @@ export default function ProfileShow() {
                                 encType="multipart/form-data"
                                 className="space-y-4"
                                 onSuccess={() => {
-                                    setAvatarPreview((current) => {
-                                        if (current) {
-                                            URL.revokeObjectURL(current);
-                                        }
-                                        return null;
-                                    });
-                                    setCoverPreview((current) => {
-                                        if (current) {
-                                            URL.revokeObjectURL(current);
-                                        }
-                                        return null;
-                                    });
+                                    resetProfileMediaPreviews();
                                 }}
                             >
                                 {({ processing, errors }) => (
@@ -186,11 +199,11 @@ export default function ProfileShow() {
                                         <input
                                             type="hidden"
                                             name="email"
-                                            defaultValue={auth?.user?.email ?? profileUser.email}
+                                            defaultValue={auth?.user?.email}
                                         />
 
-                                        <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
-                                            <div className="h-36 w-full md:h-44">
+                                        <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/10">
+                                            <div className="h-36 w-full sm:h-44">
                                                 {coverSrc ? (
                                                     <img
                                                         src={coverSrc}
@@ -201,7 +214,7 @@ export default function ProfileShow() {
                                                     <PlaceholderPattern className="size-full stroke-foreground/10" />
                                                 )}
                                             </div>
-                                            <label className="absolute right-3 top-3 inline-flex cursor-pointer items-center gap-2 rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-foreground shadow-sm transition hover:bg-background">
+                                            <label className="absolute right-3 top-3 inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-background">
                                                 {t('profile_page.cover_change')}
                                                 <Input
                                                     type="file"
@@ -213,43 +226,108 @@ export default function ProfileShow() {
                                             </label>
                                         </div>
 
-                                        <div className="flex flex-wrap items-center justify-between gap-4">
-                                            <div className="flex flex-wrap items-center gap-4">
-                                                <label className="relative cursor-pointer">
-                                                    <Avatar className="h-16 w-16">
-                                                        <AvatarImage
-                                                            src={avatarSrc ?? undefined}
-                                                            alt={profileUser.name}
+                                        <div className="relative -mt-8 flex flex-col gap-4 sm:-mt-10">
+                                            <div className="flex flex-wrap items-end justify-between gap-4">
+                                                <div className="flex items-end gap-4">
+                                                    <label className="relative cursor-pointer">
+                                                        <Avatar className="h-20 w-20 ring-2 ring-background sm:h-24 sm:w-24">
+                                                            <AvatarImage
+                                                                src={avatarSrc ?? undefined}
+                                                                alt={profileUser.name}
+                                                            />
+                                                            <AvatarFallback className="bg-muted text-foreground">
+                                                                {getInitials(profileUser.name)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <Input
+                                                            type="file"
+                                                            name="avatar"
+                                                            accept="image/*"
+                                                            onChange={handleAvatarChange}
+                                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                                         />
-                                                        <AvatarFallback className="bg-muted text-foreground">
-                                                            {getInitials(profileUser.name)}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <Input
-                                                        type="file"
-                                                        name="avatar"
-                                                        accept="image/*"
-                                                        onChange={handleAvatarChange}
-                                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                                    />
-                                                </label>
-                                                <div>
-                                                    <CardTitle className="text-xl font-semibold">
-                                                        {profileUser.name}
-                                                    </CardTitle>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {profileUser.email}
-                                                    </p>
-                                                    {profileUser.created_at && (
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {t('profile_page.joined', {
-                                                                date: formatDate(profileUser.created_at),
-                                                            })}
-                                                        </p>
-                                                    )}
+                                                    </label>
+                                                    <div className="space-y-1">
+                                                        <CardTitle className="text-xl font-semibold">
+                                                            {profileUser.name}
+                                                        </CardTitle>
+                                                        {profileUser.created_at && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {t('profile_page.joined', {
+                                                                    date: formatDate(profileUser.created_at),
+                                                                })}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                {hasProfileChanges && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Button type="submit" disabled={processing}>
+                                                            {t('common.save')}
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={resetProfileMediaPreviews}
+                                                            disabled={processing}
+                                                        >
+                                                            {t('common.cancel')}
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="flex flex-wrap items-center gap-4 text-sm">
+
+                                            <div className="w-full">
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        {t('profile_page.bio_label')}
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (isEditingBio) {
+                                                                setIsEditingBio(false);
+                                                                setBioDraft(null);
+                                                                return;
+                                                            }
+
+                                                            setIsEditingBio(true);
+                                                            setBioDraft(profileUser.bio ?? '');
+                                                        }}
+                                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                                        aria-label={t('common.edit')}
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                                {isEditingBio ? (
+                                                    <>
+                                                        <textarea
+                                                            name="bio"
+                                                            value={bioDraft ?? ''}
+                                                            onChange={(event) =>
+                                                                setBioDraft(event.target.value)
+                                                            }
+                                                            rows={4}
+                                                            placeholder={t('profile_page.bio_placeholder')}
+                                                            className="no-scrollbar mt-2 w-full resize-none overflow-auto rounded-lg bg-muted/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                                                        />
+                                                        <p className="mt-2 text-[11px] text-muted-foreground">
+                                                            {t('profile_page.bio_limit')}
+                                                        </p>
+                                                        <InputError className="mt-1" message={errors.bio} />
+                                                    </>
+                                                ) : (
+                                                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                                                        {renderBioContent(
+                                                            profileUser.bio ?? '',
+                                                            t('profile_page.bio_placeholder'),
+                                                        )}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
                                                 <ProfileStat
                                                     label={t('profile_page.posts')}
                                                     value={profileUser.posts_count ?? postsCount}
@@ -262,9 +340,6 @@ export default function ProfileShow() {
                                                     label={t('profile_page.following')}
                                                     value={profileUser.following_count ?? 0}
                                                 />
-                                                <Button type="submit" disabled={processing}>
-                                                    {t('common.save')}
-                                                </Button>
                                             </div>
                                         </div>
                                         <div className="grid gap-1 text-xs text-destructive">
@@ -276,8 +351,8 @@ export default function ProfileShow() {
                             </Form>
                         ) : (
                             <>
-                                <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
-                                    <div className="h-36 w-full md:h-44">
+                                <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/10">
+                                    <div className="h-36 w-full sm:h-44">
                                         {coverSrc ? (
                                             <img
                                                 src={coverSrc}
@@ -290,31 +365,30 @@ export default function ProfileShow() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center justify-between gap-4">
-                                    <div className="flex flex-wrap items-center gap-4">
-                                        <Avatar className="h-16 w-16">
-                                            <AvatarImage
-                                                src={avatarSrc ?? undefined}
-                                                alt={profileUser.name}
-                                            />
-                                            <AvatarFallback className="bg-muted text-foreground">
-                                                {getInitials(profileUser.name)}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <CardTitle className="text-xl font-semibold">
-                                                {profileUser.name}
-                                            </CardTitle>
-                                            <p className="text-sm text-muted-foreground">
-                                                {profileUser.email}
-                                            </p>
-                                            {profileUser.created_at && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {t('profile_page.joined', {
-                                                        date: formatDate(profileUser.created_at),
-                                                    })}
-                                                </p>
-                                            )}
+                                <div className="relative -mt-8 flex flex-col gap-4 sm:-mt-10">
+                                    <div className="flex flex-wrap items-end justify-between gap-4">
+                                        <div className="flex items-end gap-4">
+                                            <Avatar className="h-20 w-20 ring-2 ring-background sm:h-24 sm:w-24">
+                                                <AvatarImage
+                                                    src={avatarSrc ?? undefined}
+                                                    alt={profileUser.name}
+                                                />
+                                                <AvatarFallback className="bg-muted text-foreground">
+                                                    {getInitials(profileUser.name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="space-y-1">
+                                                <CardTitle className="text-xl font-semibold">
+                                                    {profileUser.name}
+                                                </CardTitle>
+                                                {profileUser.created_at && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t('profile_page.joined', {
+                                                            date: formatDate(profileUser.created_at),
+                                                        })}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                         {!isSelf && (
                                             <Button
@@ -340,7 +414,8 @@ export default function ProfileShow() {
                                                         {},
                                                         {
                                                             preserveScroll: true,
-                                                            onFinish: () => setIsFollowSubmitting(false),
+                                                            onFinish: () =>
+                                                                setIsFollowSubmitting(false),
                                                         },
                                                     );
                                                 }}
@@ -353,7 +428,18 @@ export default function ProfileShow() {
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                                    <div className="w-full">
+                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                            {t('profile_page.bio_label')}
+                                        </div>
+                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                                            {renderBioContent(
+                                                profileUser.bio ?? '',
+                                                t('profile_page.bio_placeholder'),
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
                                         <ProfileStat
                                             label={t('profile_page.posts')}
                                             value={profileUser.posts_count ?? postsCount}
@@ -478,4 +564,54 @@ function appendCacheBuster(url?: string | null, updatedAt?: string | null): stri
 
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}v=${encodeURIComponent(updatedAt)}`;
+}
+
+const BIO_URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;
+
+function renderBioContent(value: string, placeholder: string): React.ReactNode {
+    const text = value.trim() ? value : placeholder;
+    const lines = text.split('\n');
+
+    return lines.map((line, index) => (
+        <span key={`bio-line-${index}`}>
+            {renderBioLineWithLinks(line, index)}
+            {index < lines.length - 1 && <br />}
+        </span>
+    ));
+}
+
+function renderBioLineWithLinks(
+    line: string,
+    index: number,
+): React.ReactNode[] | React.ReactNode {
+    BIO_URL_REGEX.lastIndex = 0;
+
+    const fragments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = BIO_URL_REGEX.exec(line))) {
+        const url = match[0];
+        const start = match.index;
+
+        if (start > lastIndex) fragments.push(line.slice(lastIndex, start));
+
+        fragments.push(
+            <a
+                key={`bio-link-${index}-${start}`}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+            >
+                {url}
+            </a>,
+        );
+
+        lastIndex = start + url.length;
+    }
+
+    if (lastIndex < line.length) fragments.push(line.slice(lastIndex));
+
+    return fragments.length === 0 ? line : fragments;
 }

@@ -77,9 +77,9 @@ class UserProfileController extends Controller
             'profile_user' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'email' => $user->email,
                 'avatar' => $user->avatar,
                 'cover' => $user->cover,
+                'bio' => $user->bio,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'posts_count' => $user->posts_count ?? 0,

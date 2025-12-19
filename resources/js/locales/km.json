@@ -144,6 +144,9 @@
         "unfollow_description": "ឈប់បន្ទាប់ពីអ្នកមិនត្រូវការតាមដាន {name} ទៀត។ អ្នកអាចតាមដានវិញនៅពេលក្រោយ។",
         "unfollow_confirm": "ឈប់តាម {name}",
         "cover_change": "Change cover",
+        "bio_label": "Bio",
+        "bio_placeholder": "សរសេរពីខ្លួនអ្នក...",
+        "bio_limit": "អតិបរមា 500 តួអក្សរ",
         "empty": "មិនទាន់មានប្រកាសទេ។",
         "joined": "បានចូលរួម {date}"
     },
@@ -353,5 +356,3 @@
         "scroll_to_top": "រុញទៅលើ"
     }
 }
-
-

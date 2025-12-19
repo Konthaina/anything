@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'avatar_path',
         'cover_path',
+        'bio',
     ];
 
     /**
