@@ -2,12 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SiteSetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
-use Inertia\Middleware;
-use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Auth;
+use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -46,6 +45,7 @@ class HandleInertiaRequests extends Middleware
             : null;
 
         $siteName = $site?->name ?? config('app.name');
+        $logo = $site?->logo ?? asset('favicon.svg');
         $user = $request->user();
         if ($user) {
             $user->loadMissing('roles.permissions');
@@ -61,7 +61,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'app' => [
                 'name' => $siteName,
-                'logo' => $site?->logo,
+                'logo' => $logo,
                 'updated_at' => optional($site?->updated_at)?->toIso8601String(),
             ],
             'canManageAppearance' => $user
