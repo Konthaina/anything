@@ -8,6 +8,8 @@ use App\Events\PostLikesUpdated;
 use App\Events\PostShared;
 use App\Events\PostUpdated;
 use App\Models\Post;
+use App\Models\PostLike;
+use App\Models\PostShare;
 use App\Notifications\PostLikedNotification;
 use App\Notifications\PostSharedNotification;
 use App\Notifications\PostUnlikedNotification;
@@ -27,33 +29,11 @@ class FeedController extends Controller
 {
     private const MAX_IMAGES = 7;
 
+    private const POSTS_PER_PAGE = 10;
+
     public function index(Request $request): Response
     {
         $user = $request->user();
-
-        $likedPostIds = $user
-            ? DB::table('post_likes')
-                ->where('user_id', $user->id)
-                ->pluck('post_id')
-                ->all()
-            : [];
-
-        $likedLookup = array_fill_keys($likedPostIds, true);
-
-        $sharedPostIds = $user
-            ? DB::table('post_shares')
-                ->where('user_id', $user->id)
-                ->pluck('post_id')
-                ->all()
-            : [];
-
-        $sharedLookup = array_fill_keys($sharedPostIds, true);
-
-        $lookups = [
-            'liked' => $likedLookup,
-            'shared' => $sharedLookup,
-        ];
-
         $posts = Post::query()
             ->with([
                 'user:id,name,email,avatar_path',
@@ -72,9 +52,41 @@ class FeedController extends Controller
                 },
             ])
             ->latest()
-            ->get()
-            ->map(fn (Post $post) => FeedPostPresenter::present($post, $lookups))
+            ->paginate(self::POSTS_PER_PAGE);
+
+        $lookupIds = $posts->getCollection()
+            ->pluck('shared_post_id')
+            ->filter()
+            ->merge($posts->getCollection()->pluck('id'))
+            ->unique()
             ->values();
+
+        $likedLookup = [];
+        $sharedLookup = [];
+
+        if ($user && $lookupIds->isNotEmpty()) {
+            $likedPostIds = PostLike::query()
+                ->where('user_id', $user->id)
+                ->whereIn('post_id', $lookupIds)
+                ->pluck('post_id')
+                ->all();
+
+            $sharedPostIds = PostShare::query()
+                ->where('user_id', $user->id)
+                ->whereIn('post_id', $lookupIds)
+                ->pluck('post_id')
+                ->all();
+
+            $likedLookup = array_fill_keys($likedPostIds, true);
+            $sharedLookup = array_fill_keys($sharedPostIds, true);
+        }
+
+        $lookups = [
+            'liked' => $likedLookup,
+            'shared' => $sharedLookup,
+        ];
+
+        $posts->through(fn (Post $post) => FeedPostPresenter::present($post, $lookups));
 
         $notifications = $user
             ? $user->notifications()
@@ -87,7 +99,7 @@ class FeedController extends Controller
         $unreadCount = $user ? $user->unreadNotifications()->count() : 0;
 
         return Inertia::render('feed/index', [
-            'posts' => $posts,
+            'posts' => Inertia::scroll($posts),
             'notifications' => $notifications,
             'notifications_unread_count' => $unreadCount,
         ]);

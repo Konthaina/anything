@@ -26,7 +26,7 @@ import { getEchoInstance } from '@/lib/echo-client';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
 import { type AppNotification, type BreadcrumbItem, type SharedData } from '@/types';
-import { Form, Head, router, useForm, usePage } from '@inertiajs/react';
+import { Form, Head, router, useForm, usePage, WhenVisible } from '@inertiajs/react';
 import {
     ArrowUp,
     Bell,
@@ -75,6 +75,31 @@ interface FeedComment {
     user: FeedUser;
     parent_id?: number | null;
     replies?: FeedComment[];
+}
+
+interface Paginated<T> {
+    data: T[];
+    links: {
+        url: string | null;
+        label: string;
+        active: boolean;
+    }[];
+    meta?: {
+        current_page: number;
+        last_page: number;
+        from: number | null;
+        to: number | null;
+        total: number;
+        per_page: number;
+    };
+}
+
+interface ScrollMetadata {
+    pageName: string;
+    previousPage: number | string | null;
+    nextPage: number | string | null;
+    currentPage: number | string | null;
+    reset?: boolean;
 }
 
 interface UserNotificationCreatedPayload {
@@ -160,6 +185,36 @@ function normalizePost(post?: Partial<FeedPost>, includeShared = true): FeedPost
     };
 }
 
+function mergeFeedPosts(current: FeedPost[], incoming: FeedPost[]): FeedPost[] {
+    if (incoming.length === 0) {
+        return current;
+    }
+
+    const indexById = new Map(current.map((post, index) => [String(post.id), index]));
+    const next = [...current];
+
+    incoming.forEach((post) => {
+        const key = String(post.id);
+        const existingIndex = indexById.get(key);
+
+        if (existingIndex !== undefined) {
+            const existing = next[existingIndex];
+            next[existingIndex] = {
+                ...post,
+                liked: existing?.liked,
+                shared: existing?.shared,
+                comments: existing?.comments,
+            };
+            return;
+        }
+
+        indexById.set(key, next.length);
+        next.push(post);
+    });
+
+    return next;
+}
+
 function sanitizeImageUrls(urls?: string[] | null): string[] {
     return (urls ?? []).filter((url) => url && !url.includes('via.placeholder.com'));
 }
@@ -187,20 +242,29 @@ function idsAreEqual(a?: number | string | null, b?: number | string | null): bo
 const MAX_IMAGES = 7;
 
 export default function FeedPage() {
+    const page = usePage<
+        SharedData & {
+            posts?: Paginated<FeedPost>;
+            notifications?: AppNotification[];
+            notifications_unread_count?: number;
+        }
+    >();
     const {
         posts: pagePosts,
         auth,
         notifications: pageNotifications,
         notifications_unread_count: notificationsUnreadCount,
-    } = usePage<
-        SharedData & {
-            posts?: FeedPost[];
-            notifications?: AppNotification[];
-            notifications_unread_count?: number;
-        }
-    >().props;
+    } = page.props;
+    const scrollProps = (page as typeof page & { scrollProps?: Record<string, ScrollMetadata> })
+        .scrollProps;
+    const postsScroll = scrollProps?.posts;
+    const nextPostsPage = postsScroll?.nextPage ?? null;
+    const postsPageName = postsScroll?.pageName ?? 'page';
+    const currentPostsPage =
+        postsScroll?.currentPage ?? pagePosts?.meta?.current_page ?? 1;
+    const hasMorePosts = nextPostsPage !== null;
     const posts = useMemo(() => {
-        return (pagePosts ?? []).filter((post): post is FeedPost => Boolean(post));
+        return (pagePosts?.data ?? []).filter((post): post is FeedPost => Boolean(post));
     }, [pagePosts]);
     const normalizedInitialPosts = useMemo<FeedPost[]>(() => {
         return posts.map((post) => normalizePost(post));
@@ -218,8 +282,13 @@ export default function FeedPage() {
     const [showScrollTop, setShowScrollTop] = useState(false);
 
     useEffect(() => {
-        setLivePosts(normalizedInitialPosts);
-    }, [normalizedInitialPosts]);
+        if (currentPostsPage <= 1) {
+            setLivePosts(normalizedInitialPosts);
+            return;
+        }
+
+        setLivePosts((current) => mergeFeedPosts(current, normalizedInitialPosts));
+    }, [currentPostsPage, normalizedInitialPosts]);
 
     useEffect(() => {
         setLiveNotifications(notifications);
@@ -453,6 +522,25 @@ export default function FeedPage() {
                             </CardContent>
                         </Card>
                     )}
+
+                    {hasMorePosts && (
+                        <WhenVisible
+                            key={`feed-page-${nextPostsPage}`}
+                            params={{
+                                data: { [postsPageName]: nextPostsPage },
+                                only: ['posts'],
+                                preserveUrl: true,
+                            }}
+                            buffer={240}
+                            fallback={
+                                <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+                                    {t('common.loading')}
+                                </div>
+                            }
+                        >
+                            {null}
+                        </WhenVisible>
+                    )}
                 </div>
 
                 {auth?.user && (
@@ -663,6 +751,9 @@ function PostCard({
         const safeIndex = Math.min(Math.max(index, 0), images.length - 1);
         setLightboxState({ images, index: safeIndex });
     }, []);
+    const lightboxKey = lightboxState
+        ? `lightbox-${post.id}-${lightboxState.index}-${lightboxState.images.length}`
+        : `lightbox-${post.id}-closed`;
 
     const mergeIncomingComment = useCallback(
         (incoming?: FeedComment) => {
@@ -786,7 +877,8 @@ function PostCard({
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    const updatedPosts = (page.props as { posts?: FeedPost[] } | undefined)?.posts;
+                    const updatedPosts = (page.props as { posts?: Paginated<FeedPost> } | undefined)
+                        ?.posts?.data;
                     const updatedPost = updatedPosts?.find((item) => item.id === post.id);
 
                     // if server gave updated props, drop optimism
@@ -1028,6 +1120,7 @@ function PostCard({
             />
 
             <ImageViewerDialog
+                key={lightboxKey}
                 images={lightboxState?.images ?? []}
                 startIndex={lightboxState?.index ?? 0}
                 open={Boolean(lightboxState)}
@@ -1517,8 +1610,14 @@ function ImageViewerDialog({
     onOpenChange,
 }: ImageViewerDialogProps) {
     const { t } = useI18n();
-    const [currentIndex, setCurrentIndex] = useState(startIndex);
-    const [zoom, setZoom] = useState(1);
+    const minZoom = 1;
+    const maxZoom = 3;
+    const step = 0.25;
+    const clickZoom = 2;
+    const maxIndex = Math.max(0, images.length - 1);
+    const safeIndex = Math.min(Math.max(startIndex, 0), maxIndex);
+    const [currentIndex, setCurrentIndex] = useState(safeIndex);
+    const [zoom, setZoom] = useState(minZoom);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1527,12 +1626,6 @@ function ImageViewerDialog({
     const isPanningRef = useRef(false);
     const hasMovedRef = useRef(false);
     const ignoreClickRef = useRef(false);
-    const minZoom = 1;
-    const maxZoom = 3;
-    const step = 0.25;
-    const clickZoom = 2;
-    const maxIndex = Math.max(0, images.length - 1);
-    const safeIndex = Math.min(Math.max(startIndex, 0), maxIndex);
 
     const clampOffset = useCallback(
         (nextOffset: { x: number; y: number }, nextZoom: number) => {
@@ -1557,58 +1650,54 @@ function ImageViewerDialog({
         [minZoom],
     );
 
-    useEffect(() => {
-        if (!open) return;
-        setCurrentIndex(safeIndex);
-        setZoom(minZoom);
-        setOffset({ x: 0, y: 0 });
-        hasMovedRef.current = false;
-        ignoreClickRef.current = false;
-    }, [open, safeIndex, images.length, minZoom]);
+    const updateZoom = useCallback(
+        (nextZoom: number) => {
+            setZoom(nextZoom);
+            setOffset((prev) => clampOffset(prev, nextZoom));
 
-    useEffect(() => {
-        if (!open) return;
-        setZoom(minZoom);
-        setOffset({ x: 0, y: 0 });
-        hasMovedRef.current = false;
-        ignoreClickRef.current = false;
-    }, [currentIndex, open, minZoom]);
+            if (nextZoom <= minZoom) {
+                hasMovedRef.current = false;
+                ignoreClickRef.current = false;
+            }
+        },
+        [clampOffset, minZoom],
+    );
 
-    useEffect(() => {
-        if (!open) return;
-        setOffset((prev) => clampOffset(prev, zoom));
-        if (zoom <= minZoom) {
-            hasMovedRef.current = false;
-            ignoreClickRef.current = false;
-        }
-    }, [zoom, open, clampOffset, minZoom]);
+    const resetView = useCallback(() => {
+        updateZoom(minZoom);
+    }, [minZoom, updateZoom]);
 
     if (!open || images.length === 0) return null;
 
     const zoomPercent = Math.round(zoom * 100);
     const canNavigate = images.length > 1;
-    const currentImage = images[currentIndex] ?? images[0];
+    const resolvedIndex = Math.min(currentIndex, maxIndex);
+    const currentImage = images[resolvedIndex] ?? images[0];
 
     const handlePrev = () => {
         if (!canNavigate) return;
         setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+        resetView();
     };
 
     const handleNext = () => {
         if (!canNavigate) return;
         setCurrentIndex((prev) => (prev + 1) % images.length);
+        resetView();
     };
 
     const handleZoomIn = () => {
-        setZoom((prev) => Math.min(maxZoom, Number((prev + step).toFixed(2))));
+        const nextZoom = Math.min(maxZoom, Number((zoom + step).toFixed(2)));
+        updateZoom(nextZoom);
     };
 
     const handleZoomOut = () => {
-        setZoom((prev) => Math.max(minZoom, Number((prev - step).toFixed(2))));
+        const nextZoom = Math.max(minZoom, Number((zoom - step).toFixed(2)));
+        updateZoom(nextZoom);
     };
 
     const handleResetZoom = () => {
-        setZoom(minZoom);
+        resetView();
     };
 
     const handleImageClick = () => {
@@ -1617,7 +1706,8 @@ function ImageViewerDialog({
             return;
         }
 
-        setZoom((prev) => (prev === minZoom ? Math.min(clickZoom, maxZoom) : minZoom));
+        const nextZoom = zoom === minZoom ? Math.min(clickZoom, maxZoom) : minZoom;
+        updateZoom(nextZoom);
     };
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1676,7 +1766,7 @@ function ImageViewerDialog({
                         <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-white">
                             <div className="font-semibold uppercase tracking-wide">
                                 {canNavigate
-                                    ? `${currentIndex + 1} / ${images.length}`
+                                    ? `${resolvedIndex + 1} / ${images.length}`
                                     : t('feed.view_image')}
                             </div>
                             <div className="flex items-center gap-2">

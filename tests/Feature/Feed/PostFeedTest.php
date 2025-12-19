@@ -24,11 +24,11 @@ it('renders the feed page with image urls', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('feed/index')
-            ->has('posts', 1)
-            ->where('posts.0.id', $post->id)
-            ->has('posts.0.image_urls', 2)
-            ->where('posts.0.image_urls.0', Storage::disk('public')->url('posts/example.png'))
-            ->where('posts.0.image_urls.1', Storage::disk('public')->url('posts/example-two.png'))
+            ->has('posts.data', 1)
+            ->where('posts.data.0.id', $post->id)
+            ->has('posts.data.0.image_urls', 2)
+            ->where('posts.data.0.image_urls.0', Storage::disk('public')->url('posts/example.png'))
+            ->where('posts.data.0.image_urls.1', Storage::disk('public')->url('posts/example-two.png'))
         );
 });
 
