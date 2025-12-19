@@ -18,8 +18,19 @@ class UserProfileController extends Controller
     public function show(Request $request, User $user): Response
     {
         $viewer = $request->user();
-        $user->loadCount(['posts', 'followers', 'following']);
+        $canViewFollowersOnly = $viewer
+            ? ($viewer->id === $user->id || $viewer->following()->whereKey($user->id)->exists())
+            : false;
+        $user->loadCount(['followers', 'following']);
+        $postsCount = $user->posts()
+            ->when(! $canViewFollowersOnly, function ($query) {
+                $query->where('visibility', 'public');
+            })
+            ->count();
         $posts = $user->posts()
+            ->when(! $canViewFollowersOnly, function ($query) {
+                $query->where('visibility', 'public');
+            })
             ->with([
                 'user:id,name,email,avatar_path',
                 'sharedPost.user:id,name,email,avatar_path',
@@ -82,7 +93,7 @@ class UserProfileController extends Controller
                 'bio' => $user->bio,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
-                'posts_count' => $user->posts_count ?? 0,
+                'posts_count' => $postsCount,
                 'followers_count' => $user->followers_count ?? 0,
                 'following_count' => $user->following_count ?? 0,
                 'is_following' => $viewer

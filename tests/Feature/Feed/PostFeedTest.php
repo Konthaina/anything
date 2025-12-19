@@ -15,20 +15,54 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 it('renders the feed page with image urls', function () {
     $user = User::factory()->create();
+    $followed = User::factory()->create();
     $post = Post::factory()->for($user)->create([
         'image_paths' => ['posts/example.png', 'posts/example-two.png'],
+        'visibility' => 'public',
     ]);
+
+    $user->following()->attach($followed->id);
 
     $this->actingAs($user)
         ->get(route('feed.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('feed/index')
+            ->has('following_ids', 1)
+            ->where('following_ids.0', $followed->id)
             ->has('posts.data', 1)
             ->where('posts.data.0.id', $post->id)
+            ->where('posts.data.0.visibility', 'public')
             ->has('posts.data.0.image_urls', 2)
             ->where('posts.data.0.image_urls.0', Storage::disk('public')->url('posts/example.png'))
             ->where('posts.data.0.image_urls.1', Storage::disk('public')->url('posts/example-two.png'))
+        );
+});
+
+it('shows follower-only posts to followers but not to non-followers', function () {
+    $author = User::factory()->create();
+    $follower = User::factory()->create();
+    $stranger = User::factory()->create();
+
+    $post = Post::factory()->for($author)->create([
+        'visibility' => 'followers',
+    ]);
+
+    $author->followers()->attach($follower->id);
+
+    $this->actingAs($follower)
+        ->get(route('feed.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('posts.data', 1)
+            ->where('posts.data.0.id', $post->id)
+        );
+
+    $this->actingAs($stranger)
+        ->get(route('feed.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('posts.data', 0)
         );
 });
 
@@ -41,6 +75,7 @@ it('broadcasts a PostCreated event when a user creates a post', function () {
         ->from(route('feed.index', absolute: false))
         ->post(route('feed.store'), [
             'content' => 'Realtime feed rocks',
+            'visibility' => 'public',
         ])
         ->assertRedirect(route('feed.index', absolute: false));
 
@@ -62,12 +97,14 @@ it('broadcasts a PostUpdated event when a user edits a post', function () {
         ->from(route('feed.index', absolute: false))
         ->put(route('feed.update', $post), [
             'content' => 'Updated content',
+            'visibility' => 'followers',
         ])
         ->assertRedirect(route('feed.index', absolute: false));
 
     Event::assertDispatched(PostUpdated::class, function (PostUpdated $event) use ($post) {
         return $event->post->id === $post->id
-            && $event->post->content === 'Updated content';
+            && $event->post->content === 'Updated content'
+            && $event->post->visibility === 'followers';
     });
 });
 

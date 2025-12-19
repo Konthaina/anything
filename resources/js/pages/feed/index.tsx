@@ -31,6 +31,7 @@ import { Form, Head, Link, router, useForm, usePage, WhenVisible } from '@inerti
 import {
     ArrowUp,
     Bell,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Edit3,
@@ -41,6 +42,7 @@ import {
     MoreHorizontal,
     Share2,
     Trash2,
+    Users,
     X,
     ZoomIn,
     ZoomOut,
@@ -57,6 +59,7 @@ export interface FeedUser {
 export interface FeedPost {
     id: number | string;
     content: string;
+    visibility?: 'public' | 'followers';
     image_urls?: string[];
     likes_count: number;
     comments_count: number;
@@ -165,6 +168,7 @@ function normalizePost(post?: Partial<FeedPost>, includeShared = true): FeedPost
     return {
         id: post?.id ?? safeId(),
         content: post?.content ?? '',
+        visibility: post?.visibility ?? 'public',
         image_urls: post?.image_urls ?? [],
         likes_count: post?.likes_count ?? 0,
         comments_count: post?.comments_count ?? 0,
@@ -240,6 +244,31 @@ function idsAreEqual(a?: number | string | null, b?: number | string | null): bo
     return String(a) === String(b);
 }
 
+function canViewPostForUser(
+    post: FeedPost,
+    authUserId?: number | string,
+    followingIds?: Set<string>,
+): boolean {
+    const visibility = post.visibility ?? 'public';
+    if (visibility === 'public') {
+        return true;
+    }
+
+    if (!authUserId) {
+        return false;
+    }
+
+    if (idsAreEqual(post.user?.id, authUserId)) {
+        return true;
+    }
+
+    if (!followingIds) {
+        return false;
+    }
+
+    return followingIds.has(String(post.user?.id ?? ''));
+}
+
 const MAX_IMAGES = 7;
 
 export default function FeedPage() {
@@ -248,6 +277,7 @@ export default function FeedPage() {
             posts?: Paginated<FeedPost>;
             notifications?: AppNotification[];
             notifications_unread_count?: number;
+            following_ids?: number[];
         }
     >();
     const {
@@ -274,6 +304,10 @@ export default function FeedPage() {
     const notifications = useMemo(() => pageNotifications ?? [], [pageNotifications]);
     const unreadNotificationCount = notificationsUnreadCount ?? 0;
     const authUserId = auth?.user?.id;
+    const followingIds = useMemo(
+        () => new Set((page.props.following_ids ?? []).map((id) => String(id))),
+        [page.props.following_ids],
+    );
     const { t } = useI18n();
 
     const [liveNotifications, setLiveNotifications] = useState<AppNotification[]>(notifications);
@@ -333,6 +367,9 @@ export default function FeedPage() {
             if (!incoming) return;
 
             const normalized = normalizePost(incoming);
+            if (!canViewPostForUser(normalized, authUserId, followingIds)) {
+                return;
+            }
 
             setLivePosts((current) => {
                 const exists = current.some((post) => idsAreEqual(post.id, normalized.id));
@@ -358,19 +395,55 @@ export default function FeedPage() {
             if (!incoming) return;
 
             const normalized = normalizePost(incoming);
+            const canView = canViewPostForUser(normalized, authUserId, followingIds);
 
-            setLivePosts((current) =>
-                current.map((post) =>
-                    idsAreEqual(post.id, normalized.id)
-                        ? {
-                            ...normalized,
-                            liked: post.liked,
-                            shared: post.shared,
-                            comments: post.comments,
-                        }
-                        : post,
-                ),
-            );
+            setLivePosts((current) => {
+                const existingIndex = current.findIndex((post) =>
+                    idsAreEqual(post.id, normalized.id),
+                );
+
+                if (!canView) {
+                    if (existingIndex === -1) {
+                        return current;
+                    }
+
+                    return current.filter((post) => !idsAreEqual(post.id, normalized.id));
+                }
+
+                if (existingIndex === -1) {
+                    const incomingDate = normalized.created_at
+                        ? new Date(normalized.created_at).getTime()
+                        : 0;
+                    const insertIndex = current.findIndex((post) => {
+                        const postDate = post.created_at
+                            ? new Date(post.created_at).getTime()
+                            : 0;
+                        return postDate < incomingDate;
+                    });
+
+                    if (insertIndex === -1) {
+                        return [...current, normalized];
+                    }
+
+                    return [
+                        ...current.slice(0, insertIndex),
+                        normalized,
+                        ...current.slice(insertIndex),
+                    ];
+                }
+
+                const existing = current[existingIndex];
+                const nextPost = {
+                    ...normalized,
+                    liked: existing.liked,
+                    shared: existing.shared,
+                    comments: existing.comments,
+                };
+
+                return current.map((post, index) =>
+                    index === existingIndex ? nextPost : post,
+                );
+            });
         };
 
         const handleDeleted = (payload: PostDeletedPayload) => {
@@ -423,7 +496,7 @@ export default function FeedPage() {
             channel.stopListening('.PostShared');
             echo.leaveChannel(channelName);
         };
-    }, []);
+    }, [authUserId, followingIds]);
 
     useEffect(() => {
         if (!authUserId) return;
@@ -560,6 +633,8 @@ export default function FeedPage() {
     );
 }
 
+type VisibilityValue = 'public' | 'followers';
+
 export function CreatePostCard({
     currentUser,
     getInitials,
@@ -571,6 +646,7 @@ export function CreatePostCard({
     const [content, setContent] = useState<string>('');
     const [previews, setPreviews] = useState<string[]>([]);
     const previewUrlsRef = useRef<string[]>([]);
+    const [visibility, setVisibility] = useState<VisibilityValue>('public');
 
     const cleanupPreviews = () => {
         previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -604,6 +680,7 @@ export function CreatePostCard({
                 onSuccess={() => {
                     cleanupPreviews();
                     setContent('');
+                    setVisibility('public');
                 }}
             >
                 {({ setData, processing, errors, reset }) => {
@@ -667,31 +744,139 @@ export function CreatePostCard({
                                 )}
                             </CardContent>
 
-                            <CardFooter className="flex items-center justify-end gap-3 pt-4">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="text-foreground hover:bg-muted"
-                                    onClick={() => {
-                                        reset?.();
-                                        cleanupPreviews();
-                                        setContent('');
-                                        setData?.('images', []);
-                                    }}
-                                    disabled={processing}
-                                >
-                                    {t('feed.clear')}
-                                </Button>
+                            <CardFooter className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <label htmlFor="post-visibility" className="font-semibold">
+                                            {t('feed.visibility.label')}
+                                        </label>
+                                        <VisibilityDropdown
+                                            id="post-visibility"
+                                            name="visibility"
+                                            value={visibility}
+                                            onChange={(value) => {
+                                                setVisibility(value);
+                                                setData?.('visibility', value);
+                                            }}
+                                        />
+                                    </div>
+                                    <InputError message={errors.visibility} />
+                                </div>
 
-                                <Button type="submit" disabled={processing}>
-                                    {t('feed.post')}
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
+                                        onClick={() => {
+                                            reset?.();
+                                            cleanupPreviews();
+                                            setContent('');
+                                            setData?.('images', []);
+                                            setVisibility('public');
+                                            setData?.('visibility', 'public');
+                                        }}
+                                        disabled={processing}
+                                    >
+                                        {t('feed.clear')}
+                                    </Button>
+
+                                    <Button type="submit" size="sm" className="h-8 px-4 text-xs" disabled={processing}>
+                                        {t('feed.post')}
+                                    </Button>
+                                </div>
                             </CardFooter>
                         </>
                     );
                 }}
             </Form>
         </Card>
+    );
+}
+
+function VisibilityDropdown({
+    value,
+    onChange,
+    name,
+    id,
+    disabled = false,
+    className,
+}: {
+    value: VisibilityValue;
+    onChange: (value: VisibilityValue) => void;
+    name: string;
+    id?: string;
+    disabled?: boolean;
+    className?: string;
+}) {
+    const { t } = useI18n();
+    const options = [
+        { value: 'public', label: t('feed.visibility.public'), icon: Globe2 },
+        { value: 'followers', label: t('feed.visibility.followers'), icon: Users },
+    ] as const;
+    const current =
+        options.find((option) => option.value === value) ?? options[0];
+    const CurrentIcon = current.icon;
+
+    return (
+        <DropdownMenu>
+            <input type="hidden" name={name} value={value} />
+            <DropdownMenuTrigger asChild>
+                <Button
+                    type="button"
+                    id={id}
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled}
+                    className={cn(
+                        'h-7 rounded-full px-2.5 text-[11px] font-semibold',
+                        className,
+                    )}
+                >
+                    <CurrentIcon className="h-3.5 w-3.5" />
+                    <span>{current.label}</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48 p-1">
+                {options.map((option) => {
+                    const selected = option.value === value;
+                    const Icon = option.icon;
+
+                    return (
+                        <DropdownMenuItem
+                            key={option.value}
+                            onSelect={() => onChange(option.value)}
+                            className={cn(
+                                'flex items-center gap-2 text-xs',
+                                selected && 'bg-accent',
+                            )}
+                        >
+                            <span
+                                className={cn(
+                                    'flex h-6 w-6 items-center justify-center rounded-full border bg-background',
+                                    selected
+                                        ? 'border-primary/50 text-primary'
+                                        : 'border-border text-muted-foreground',
+                                )}
+                            >
+                                <Icon className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="flex-1 text-sm font-semibold text-foreground">
+                                {option.label}
+                            </span>
+                            {selected && (
+                                <span
+                                    className="h-2 w-2 rounded-full bg-primary"
+                                    aria-hidden
+                                />
+                            )}
+                        </DropdownMenuItem>
+                    );
+                })}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -705,7 +890,7 @@ export function PostCard({
     authUserId?: number;
 }) {
     const { t } = useI18n();
-
+    const visibilityLabel = t(`feed.visibility.${post.visibility ?? 'public'}` as const);
     const [likeProcessing, setLikeProcessing] = useState(false);
     const [commentsOpen, setCommentsOpen] = useState(false);
     const [hiddenImages, setHiddenImages] = useState<string[]>([]);
@@ -938,9 +1123,8 @@ export function PostCard({
                         <div className="text-sm font-semibold leading-tight">{post.user.name}</div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <span>{timestamp}</span>
-                            <span>·</span>
-                            <Globe2 className="h-3.5 w-3.5" />
-                            <span>{t('feed.visibility.public')}</span>
+                            <span className="text-muted-foreground/60">-</span>
+                            <span>{visibilityLabel}</span>
                         </div>
                     </div>
                 </Link>
@@ -1155,85 +1339,38 @@ interface EditPostDialogProps {
 function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const { t } = useI18n();
 
-    const form = useForm({
+    const defaultVisibility = post.visibility ?? 'public';
+    const form = useForm<{
+        content: string;
+        images: File[];
+        remove_image: boolean;
+        visibility: VisibilityValue;
+    }>({
         content: post.content ?? '',
         images: [] as File[],
         remove_image: false,
+        visibility: defaultVisibility,
     });
 
     const { setData, clearErrors } = form;
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-    const previewBlobRef = useRef<string[]>([]);
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
     const [, rerender] = useState(0);
     const bump = () => rerender((v) => v + 1);
 
-    const cleanupBlobUrls = () => {
-        previewBlobRef.current.forEach((url) => URL.revokeObjectURL(url));
-        previewBlobRef.current = [];
-    };
-
     useEffect(() => {
         // reset form fields when switching post or opening dialog
-        setData({
-            content: post.content ?? '',
-            images: [],
-            remove_image: false,
-        });
+        setData('content', post.content ?? '');
+        setData('images', []);
+        setData('remove_image', false);
+        setData('visibility', defaultVisibility);
         clearErrors();
 
-        if (fileInputRef.current) fileInputRef.current.value = '';
-
-        cleanupBlobUrls();
         hiddenPreviewRef.current = new Set();
 
         // NOTE: do not bump here (lint rule)
         // re-render will happen anyway when open/post.id changes
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [post.id, open]);
-
-    useEffect(() => {
-        return () => {
-            cleanupBlobUrls();
-        };
-
-    }, []);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
-
-        setData('images', files);
-        setData('remove_image', false);
-
-        cleanupBlobUrls();
-        hiddenPreviewRef.current = new Set();
-
-        if (files.length === 0) {
-            bump();
-            return;
-        }
-
-        const urls = files.map((file) => URL.createObjectURL(file));
-        previewBlobRef.current = urls;
-        bump();
-    };
-
-    const handleRemoveImage = () => {
-        const next = !form.data.remove_image;
-        setData('remove_image', next);
-
-        if (next) {
-            setData('images', []);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            cleanupBlobUrls();
-            hiddenPreviewRef.current = new Set();
-        } else {
-            hiddenPreviewRef.current = new Set();
-        }
-
-        bump();
-    };
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -1248,13 +1385,7 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
 
     const isSharePost = Boolean(post.shared_post);
 
-    const previewSources = isSharePost
-        ? []
-        : form.data.remove_image
-            ? []
-            : previewBlobRef.current.length > 0
-                ? previewBlobRef.current
-                : post.image_urls ?? [];
+    const previewSources = isSharePost ? [] : post.image_urls ?? [];
 
     const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewRef.current.has(url));
 
@@ -1267,6 +1398,20 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-4">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <label htmlFor={`edit-visibility-${post.id}`} className="font-semibold">
+                                {t('feed.visibility.label')}
+                            </label>
+                            <VisibilityDropdown
+                                id={`edit-visibility-${post.id}`}
+                                name="visibility"
+                                value={form.data.visibility}
+                                onChange={(value) => form.setData('visibility', value)}
+                            />
+                        </div>
+                        <InputError message={form.errors.visibility} />
+                    </div>
                     <div className="space-y-2 text-sm">
                         <label htmlFor={`edit-content-${post.id}`} className="font-semibold">
                             {t('feed.placeholder')}
@@ -1283,41 +1428,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
 
                         <InputError message={form.errors.content} />
                     </div>
-
-                    {!isSharePost && (
-                        <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <ImageIcon className="h-4 w-4" />
-                                <span>{t('feed.attach_image')}</span>
-                            </div>
-
-                            <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
-                                <span>{t('feed.browse')}</span>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    name="images[]"
-                                    accept="image/*"
-                                    multiple
-                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                    onChange={handleFileChange}
-                                />
-                            </label>
-
-                            <InputError message={form.errors.images} />
-
-                            <div className="flex items-center justify-end">
-                                <Button
-                                    type="button"
-                                    variant={form.data.remove_image ? 'destructive' : 'outline'}
-                                    size="sm"
-                                    onClick={handleRemoveImage}
-                                >
-                                    {form.data.remove_image ? t('feed.clear_selection') : t('feed.remove_image')}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
 
                     {!isSharePost && visiblePreviewUrls.length > 0 && (
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

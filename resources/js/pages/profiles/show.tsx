@@ -23,6 +23,7 @@ import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
 import { useI18n } from '@/contexts/language-context';
 import { Pencil } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { getEchoInstance } from '@/lib/echo-client';
 
 interface ProfileUser {
     id: number;
@@ -63,6 +64,10 @@ interface ScrollMetadata {
     reset?: boolean;
 }
 
+interface PostUpdatedPayload {
+    post?: FeedPost;
+}
+
 export default function ProfileShow() {
     const page = usePage<
         SharedData & {
@@ -73,12 +78,14 @@ export default function ProfileShow() {
     const { profile_user: profileUser, posts, auth } = page.props;
     const { t } = useI18n();
     const getInitials = useInitials();
-    const postsData = posts?.data ?? [];
+    const postsData = useMemo(() => posts?.data ?? [], [posts]);
     const scrollProps = (page as typeof page & { scrollProps?: Record<string, ScrollMetadata> })
         .scrollProps;
     const postsScroll = scrollProps?.posts;
     const nextPostsPage = postsScroll?.nextPage ?? null;
     const postsPageName = postsScroll?.pageName ?? 'page';
+    const currentPostsPage =
+        postsScroll?.currentPage ?? posts?.meta?.current_page ?? 1;
     const hasMorePosts = nextPostsPage !== null;
     const postsCount = posts?.meta?.total ?? postsData.length;
     const isSelf = auth?.user?.id === profileUser.id;
@@ -96,6 +103,7 @@ export default function ProfileShow() {
     const hasBioChanges =
         bioDraft !== null && bioDraft !== (profileUser.bio ?? '');
     const hasProfileChanges = hasProfileMediaChanges || hasBioChanges;
+    const [livePosts, setLivePosts] = useState<FeedPost[]>(postsData);
 
     const resetProfileMediaPreviews = () => {
         setAvatarPreview((current) => {
@@ -124,6 +132,86 @@ export default function ProfileShow() {
             }
         };
     }, [avatarPreview, coverPreview]);
+
+    useEffect(() => {
+        queueMicrotask(() => {
+            if (currentPostsPage <= 1) {
+                setLivePosts(postsData);
+                return;
+            }
+
+            setLivePosts((current) => mergeProfilePosts(current, postsData));
+        });
+    }, [currentPostsPage, postsData]);
+
+    useEffect(() => {
+        const echo = getEchoInstance();
+        if (!echo) return;
+
+        const channelName = 'posts';
+        const channel = echo.channel(channelName);
+
+        const handleUpdated = (payload: PostUpdatedPayload) => {
+            const incoming = payload?.post;
+            if (!incoming || incoming.user?.id !== profileUser.id) return;
+
+            const canView =
+                isSelf || isFollowing || (incoming.visibility ?? 'public') === 'public';
+
+            setLivePosts((current) => {
+                const existingIndex = current.findIndex((post) =>
+                    idsAreEqual(post.id, incoming.id),
+                );
+
+                if (!canView) {
+                    if (existingIndex === -1) return current;
+                    return current.filter((post) => !idsAreEqual(post.id, incoming.id));
+                }
+
+                if (existingIndex === -1) {
+                    const incomingDate = incoming.created_at
+                        ? new Date(incoming.created_at).getTime()
+                        : 0;
+                    const insertIndex = current.findIndex((post) => {
+                        const postDate = post.created_at
+                            ? new Date(post.created_at).getTime()
+                            : 0;
+                        return postDate < incomingDate;
+                    });
+
+                    if (insertIndex === -1) {
+                        return [...current, incoming];
+                    }
+
+                    return [
+                        ...current.slice(0, insertIndex),
+                        incoming,
+                        ...current.slice(insertIndex),
+                    ];
+                }
+
+                const existing = current[existingIndex];
+                const nextPost = {
+                    ...existing,
+                    ...incoming,
+                    liked: existing.liked,
+                    shared: existing.shared,
+                    comments: existing.comments,
+                };
+
+                return current.map((post, index) =>
+                    index === existingIndex ? nextPost : post,
+                );
+            });
+        };
+
+        channel.listen('.PostUpdated', handleUpdated);
+
+        return () => {
+            channel.stopListening('.PostUpdated');
+            echo.leaveChannel(channelName);
+        };
+    }, [isFollowing, isSelf, profileUser.id]);
 
     const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
@@ -509,7 +597,7 @@ export default function ProfileShow() {
                             getInitials={getInitials}
                         />
                     )}
-                    {postsData.map((post) => (
+                    {livePosts.map((post) => (
                         <PostCard
                             key={`profile-post-${post.id}`}
                             post={post}
@@ -518,7 +606,7 @@ export default function ProfileShow() {
                         />
                     ))}
 
-                    {postsData.length === 0 && (
+                    {livePosts.length === 0 && (
                         <Card className="border-border bg-card text-foreground shadow-lg">
                             <CardContent className="py-10 text-center text-sm text-muted-foreground">
                                 {t('profile_page.empty')}
@@ -575,6 +663,41 @@ function appendCacheBuster(url?: string | null, updatedAt?: string | null): stri
 
     const separator = url.includes('?') ? '&' : '?';
     return `${url}${separator}v=${encodeURIComponent(updatedAt)}`;
+}
+
+function mergeProfilePosts(current: FeedPost[], incoming: FeedPost[]): FeedPost[] {
+    if (incoming.length === 0) {
+        return current;
+    }
+
+    const indexById = new Map(current.map((post, index) => [String(post.id), index]));
+    const next = [...current];
+
+    incoming.forEach((post) => {
+        const key = String(post.id);
+        const existingIndex = indexById.get(key);
+
+        if (existingIndex !== undefined) {
+            next[existingIndex] = {
+                ...next[existingIndex],
+                ...post,
+            };
+            return;
+        }
+
+        indexById.set(key, next.length);
+        next.push(post);
+    });
+
+    return next;
+}
+
+function idsAreEqual(a?: number | string | null, b?: number | string | null): boolean {
+    if (a === undefined || a === null || b === undefined || b === null) {
+        return false;
+    }
+
+    return String(a) === String(b);
 }
 
 const BIO_URL_REGEX = /\bhttps?:\/\/[^\s]+/gi;

@@ -18,6 +18,7 @@ class PostFactory extends Factory
         return [
             'user_id' => User::factory(),
             'content' => fake()->paragraphs(2, true),
+            'visibility' => fake()->boolean(80) ? 'public' : 'followers',
             'image_paths' => fake()->boolean(60)
                 ? ['https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80']
                 : [],

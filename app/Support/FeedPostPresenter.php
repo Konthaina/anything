@@ -38,6 +38,7 @@ class FeedPostPresenter
         return [
             'id' => $post->id,
             'content' => $post->content,
+            'visibility' => $post->visibility ?? 'public',
             'image_urls' => $post->image_urls,
             'likes_count' => $post->likes_count ?? 0,
             'comments_count' => $post->comments_count ?? 0,

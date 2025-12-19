@@ -347,7 +347,9 @@
         "delete_confirm_description": "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។",
         "delete_confirm": "លុបប្រកាស",
         "visibility": {
-            "public": "សាធារណៈ"
+            "label": "Visibility",
+            "public": "Public",
+            "followers": "Followers only"
         },
         "notifications": "ការជូនដំណឹង",
         "mark_all_read": "សម្អាតការជូនដំណឹង",
@@ -356,3 +358,4 @@
         "scroll_to_top": "រុញទៅលើ"
     }
 }
+

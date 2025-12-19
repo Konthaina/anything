@@ -34,7 +34,24 @@ class FeedController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $followingIds = $user
+            ? $user->following()->pluck('users.id')->sort()->values()->all()
+            : [];
         $posts = Post::query()
+            ->when($user, function ($query) use ($user) {
+                $query->where(function ($visibilityQuery) use ($user) {
+                    $visibilityQuery
+                        ->where('visibility', 'public')
+                        ->orWhere('user_id', $user->id)
+                        ->orWhereExists(function ($followerQuery) use ($user) {
+                            $followerQuery
+                                ->selectRaw('1')
+                                ->from('user_followers')
+                                ->whereColumn('user_followers.following_id', 'posts.user_id')
+                                ->where('user_followers.follower_id', $user->id);
+                        });
+                });
+            })
             ->with([
                 'user:id,name,email,avatar_path',
                 'sharedPost.user:id,name,email,avatar_path',
@@ -102,6 +119,7 @@ class FeedController extends Controller
             'posts' => Inertia::scroll($posts),
             'notifications' => $notifications,
             'notifications_unread_count' => $unreadCount,
+            'following_ids' => $followingIds,
         ]);
     }
 
@@ -167,6 +185,7 @@ class FeedController extends Controller
 
             $sharedPost = $user->posts()->create([
                 'content' => $shareContent,
+                'visibility' => $shareTarget->visibility ?? 'public',
                 'image_paths' => [],
                 'likes_count' => 0,
                 'comments_count' => 0,
@@ -207,12 +226,14 @@ class FeedController extends Controller
             'content' => ['required', 'string', 'max:2000'],
             'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
             'images.*' => ['image', 'max:5120'],
+            'visibility' => ['required', 'string', 'in:public,followers'],
         ]);
 
         $imagePaths = $this->storeUploadedImages($this->gatherUploadedFiles($request->file('images')));
 
         $post = $request->user()->posts()->create([
             'content' => $data['content'],
+            'visibility' => $data['visibility'],
             'image_paths' => $imagePaths,
             'likes_count' => 0,
             'comments_count' => 0,
@@ -233,6 +254,7 @@ class FeedController extends Controller
             'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
             'images.*' => ['image', 'max:5120'],
             'remove_image' => ['nullable', 'boolean'],
+            'visibility' => ['required', 'string', 'in:public,followers'],
         ]);
 
         $imagePaths = $post->image_paths ?? [];
@@ -252,6 +274,7 @@ class FeedController extends Controller
         $post->update([
             'content' => $data['content'],
             'image_paths' => $imagePaths,
+            'visibility' => $data['visibility'],
         ]);
 
         $post->refresh();

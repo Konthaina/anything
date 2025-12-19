@@ -330,7 +330,9 @@
         "delete_confirm_description": "This action cannot be undone.",
         "delete_confirm": "Delete post",
         "visibility": {
-            "public": "Public"
+            "label": "Visibility",
+            "public": "Public",
+            "followers": "Followers only"
         },
         "notifications": "Notifications",
         "mark_all_read": "Mark all read",
