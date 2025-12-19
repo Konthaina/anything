@@ -11,7 +11,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Illuminate\Support\Collection;
 
 class User extends Authenticatable
 {
@@ -28,6 +27,7 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar_path',
+        'cover_path',
     ];
 
     /**
@@ -49,6 +49,7 @@ class User extends Authenticatable
      */
     protected $appends = [
         'avatar',
+        'cover',
     ];
 
     /**
@@ -73,9 +74,21 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class);
     }
 
-    public function posts()
+    public function posts(): HasMany
     {
         return $this->hasMany(Post::class);
+    }
+
+    public function followers(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'user_followers', 'following_id', 'follower_id')
+            ->withTimestamps();
+    }
+
+    public function following(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'user_followers', 'follower_id', 'following_id')
+            ->withTimestamps();
     }
 
     public function likedPosts(): BelongsToMany
@@ -124,7 +137,19 @@ class User extends Authenticatable
 
             // Fallback to Gravatar (or any identicon) so we always have an image URL.
             $hash = md5(strtolower(trim($this->email)));
+
             return "https://www.gravatar.com/avatar/{$hash}?s=256&d=identicon";
+        });
+    }
+
+    protected function cover(): Attribute
+    {
+        return Attribute::get(function () {
+            if (! $this->cover_path) {
+                return null;
+            }
+
+            return Storage::disk('public')->url($this->cover_path);
         });
     }
 }

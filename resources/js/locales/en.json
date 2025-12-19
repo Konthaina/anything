@@ -133,6 +133,20 @@
             "confirm_body": "Once your account is deleted, all of its resources and data will also be permanently deleted. Please enter your password to confirm you would like to permanently delete your account."
         }
     },
+    "profile_page": {
+        "title": "Profile",
+        "posts": "Posts",
+        "followers": "Followers",
+        "following": "Following",
+        "follow": "Follow",
+        "unfollow": "Unfollow",
+        "cover_change": "Change cover",
+        "unfollow_title": "Unfollow {name}",
+        "unfollow_description": "Stop following {name}? You can follow them again later.",
+        "unfollow_confirm": "Unfollow {name}",
+        "empty": "No posts yet.",
+        "joined": "Joined {date}"
+    },
     "password": {
         "breadcrumb": "Password settings",
         "title": "Update password",

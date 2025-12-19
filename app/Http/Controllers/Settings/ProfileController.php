@@ -34,7 +34,7 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        $user->fill($request->safe()->except('avatar'));
+        $user->fill($request->safe()->except(['avatar', 'cover']));
 
         if ($request->hasFile('avatar')) {
             if ($user->avatar_path) {
@@ -44,13 +44,21 @@ class ProfileController extends Controller
             $user->avatar_path = $this->storeCroppedAvatar($request->file('avatar'));
         }
 
+        if ($request->hasFile('cover')) {
+            if ($user->cover_path) {
+                Storage::disk('public')->delete($user->cover_path);
+            }
+
+            $user->cover_path = $this->storeCoverImage($request->file('cover'));
+        }
+
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
         $user->save();
 
-        return to_route('profile.edit');
+        return back();
     }
 
     /**
@@ -66,6 +74,9 @@ class ProfileController extends Controller
 
         if ($user->avatar_path) {
             Storage::disk('public')->delete($user->avatar_path);
+        }
+        if ($user->cover_path) {
+            Storage::disk('public')->delete($user->cover_path);
         }
 
         Auth::logout();
@@ -128,5 +139,10 @@ class ProfileController extends Controller
         Storage::disk('public')->put($path, $contents);
 
         return $path;
+    }
+
+    protected function storeCoverImage(UploadedFile $file): string
+    {
+        return $file->store('covers', 'public');
     }
 }

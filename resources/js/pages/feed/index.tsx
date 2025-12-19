@@ -25,8 +25,9 @@ import AppLayout from '@/layouts/app-layout';
 import { getEchoInstance } from '@/lib/echo-client';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/contexts/language-context';
+import { show as showProfile } from '@/routes/profiles';
 import { type AppNotification, type BreadcrumbItem, type SharedData } from '@/types';
-import { Form, Head, router, useForm, usePage, WhenVisible } from '@inertiajs/react';
+import { Form, Head, Link, router, useForm, usePage, WhenVisible } from '@inertiajs/react';
 import {
     ArrowUp,
     Bell,
@@ -46,14 +47,14 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-interface FeedUser {
+export interface FeedUser {
     id: number;
     name: string;
     email: string;
     avatar?: string | null;
 }
 
-interface FeedPost {
+export interface FeedPost {
     id: number | string;
     content: string;
     image_urls?: string[];
@@ -68,7 +69,7 @@ interface FeedPost {
     comments?: FeedComment[];
 }
 
-interface FeedComment {
+export interface FeedComment {
     id: number | string;
     content: string;
     created_at: string;
@@ -694,7 +695,7 @@ function CreatePostCard({
     );
 }
 
-function PostCard({
+export function PostCard({
     post,
     getInitials,
     authUserId,
@@ -922,7 +923,10 @@ function PostCard({
     return (
         <Card className="overflow-hidden border-border bg-card text-foreground shadow-2xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-                <div className="flex items-start gap-3">
+                <Link
+                    href={showProfile(post.user.id)}
+                    className="flex items-start gap-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+                >
                     <Avatar className="h-11 w-11">
                         <AvatarImage src={post.user.avatar ?? undefined} alt={post.user.name} />
                         <AvatarFallback className="bg-muted text-foreground">
@@ -939,7 +943,7 @@ function PostCard({
                             <span>{t('feed.visibility.public')}</span>
                         </div>
                     </div>
-                </div>
+                </Link>
 
                 {isAuthor && (
                     <DropdownMenu>
@@ -983,9 +987,19 @@ function PostCard({
                 {sharedPost ? (
                     <>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-foreground">{post.user.name}</span>
+                            <Link
+                                href={showProfile(post.user.id)}
+                                className="font-semibold text-foreground underline-offset-4 hover:underline"
+                            >
+                                {post.user.name}
+                            </Link>
                             <Share2 className="h-3 w-3 text-muted-foreground" />
-                            <span className="font-semibold text-foreground">{sharedPost.user.name}</span>
+                            <Link
+                                href={showProfile(sharedPost.user.id)}
+                                className="font-semibold text-foreground underline-offset-4 hover:underline"
+                            >
+                                {sharedPost.user.name}
+                            </Link>
                         </div>
 
                         {hasContent &&
@@ -1959,7 +1973,10 @@ function SharedPostPreview({
 
     return (
         <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
-            <div className="flex items-start gap-3">
+            <Link
+                href={showProfile(post.user.id)}
+                className="flex items-start gap-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+            >
                 <Avatar className="h-10 w-10">
                     <AvatarImage src={post.user.avatar ?? undefined} alt={post.user.name} />
                     <AvatarFallback className="bg-muted text-foreground">
@@ -1973,7 +1990,7 @@ function SharedPostPreview({
                     </div>
                     <div className="text-xs text-muted-foreground">{timestamp}</div>
                 </div>
-            </div>
+            </Link>
 
             {(post.content ?? '').split('\n').map((line, idx) => (
                 <p key={`shared-preview-${idx}`}>{renderLineWithLinks(line, idx)}</p>
@@ -2218,4 +2235,3 @@ function renderLineWithLinks(line: string, index: number): React.ReactNode[] | R
 
     return fragments.length === 0 ? line : fragments;
 }
-

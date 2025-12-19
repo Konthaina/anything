@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -17,6 +19,7 @@ test('profile information can be updated', function () {
 
     $response = $this
         ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
         ->patch(route('profile.update'), [
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -24,7 +27,7 @@ test('profile information can be updated', function () {
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('profile.edit'));
+        ->assertRedirect(route('profile.edit', absolute: false));
 
     $user->refresh();
 
@@ -38,6 +41,7 @@ test('email verification status is unchanged when the email address is unchanged
 
     $response = $this
         ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
         ->patch(route('profile.update'), [
             'name' => 'Test User',
             'email' => $user->email,
@@ -45,9 +49,34 @@ test('email verification status is unchanged when the email address is unchanged
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('profile.edit'));
+        ->assertRedirect(route('profile.edit', absolute: false));
 
     expect($user->refresh()->email_verified_at)->not->toBeNull();
+});
+
+test('user can update their cover image', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $cover = UploadedFile::fake()->image('cover.jpg', 1400, 400);
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('profile.edit', absolute: false))
+        ->patch(route('profile.update'), [
+            'name' => $user->name,
+            'email' => $user->email,
+            'cover' => $cover,
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('profile.edit', absolute: false));
+
+    $user->refresh();
+
+    expect($user->cover_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($user->cover_path);
 });
 
 test('user can delete their account', function () {
