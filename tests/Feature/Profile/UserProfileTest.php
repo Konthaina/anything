@@ -31,5 +31,6 @@ it('shows a user profile with their posts', function () {
             ->where('profile_user.following_count', 1)
             ->has('posts.data', 1)
             ->where('posts.data.0.id', $profilePost->id)
+            ->where('posts.data.0.user.id', $profileUser->id)
         );
 });

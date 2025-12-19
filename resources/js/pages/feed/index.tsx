@@ -560,7 +560,7 @@ export default function FeedPage() {
     );
 }
 
-function CreatePostCard({
+export function CreatePostCard({
     currentUser,
     getInitials,
 }: {

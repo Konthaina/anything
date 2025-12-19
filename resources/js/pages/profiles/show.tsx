@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { PostCard, type FeedPost } from '@/pages/feed/index';
+import { CreatePostCard, PostCard, type FeedPost } from '@/pages/feed/index';
 import { follow, show as showProfile, unfollow } from '@/routes/profiles';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
@@ -498,6 +498,17 @@ export default function ProfileShow() {
                 </Dialog>
 
                 <div className="space-y-4">
+                    {isSelf && auth?.user && (
+                        <CreatePostCard
+                            currentUser={{
+                                id: auth.user.id,
+                                name: auth.user.name,
+                                email: auth.user.email,
+                                avatar: auth.user.avatar ?? null,
+                            }}
+                            getInitials={getInitials}
+                        />
+                    )}
                     {postsData.map((post) => (
                         <PostCard
                             key={`profile-post-${post.id}`}
