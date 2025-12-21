@@ -53,7 +53,8 @@
         "profile": "Profile"
     },
     "header": {
-        "navigation_menu": "Navigation Menu"
+        "navigation_menu": "Navigation Menu",
+        "search_placeholder": "Search users..."
     },
     "auth": {
         "login_title": "Log in to your account",

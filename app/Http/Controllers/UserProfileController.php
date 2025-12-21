@@ -15,6 +15,38 @@ class UserProfileController extends Controller
 {
     private const POSTS_PER_PAGE = 10;
 
+    public function index(Request $request): Response
+    {
+        $search = trim((string) $request->query('search', ''));
+
+        $users = User::query()
+            ->select('id', 'name', 'email', 'avatar_path', 'is_verified')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($userQuery) use ($search) {
+                    $userQuery
+                        ->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%');
+                });
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get()
+            ->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => $user->avatar,
+                'is_verified' => (bool) $user->is_verified,
+            ]);
+
+        return Inertia::render('profiles/index', [
+            'users' => $users,
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
+    }
+
     public function show(Request $request, User $user): Response
     {
         $viewer = $request->user();

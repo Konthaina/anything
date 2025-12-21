@@ -98,3 +98,28 @@ it('counts profile posts based on visibility for the viewer', function () {
             ->where('profile_user.posts_count', 2)
         );
 });
+
+it('filters users on the profiles index page', function () {
+    $viewer = User::factory()->create([
+        'name' => 'Viewer Person',
+    ]);
+    $match = User::factory()->create([
+        'name' => 'Jane Doe',
+        'is_verified' => true,
+    ]);
+    User::factory()->create([
+        'name' => 'Other User',
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('profiles.index', ['search' => 'Jane']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('profiles/index')
+            ->has('users', 1)
+            ->where('users.0.id', $match->id)
+            ->where('users.0.name', $match->name)
+            ->where('users.0.is_verified', true)
+            ->where('filters.search', 'Jane')
+        );
+});

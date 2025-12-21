@@ -53,7 +53,8 @@
         "profile": "ពត៌មានផ្ទាល់ខ្លួន"
     },
     "header": {
-        "navigation_menu": "ម៉ឺនុយនាវីហ្គេស្យុង"
+        "navigation_menu": "ម៉ឺនុយនាវីហ្គេស្យុង",
+        "search_placeholder": "ស្វែងរកអ្នកប្រើ..."
     },
     "auth": {
         "login_title": "ចូលគណនីរបស់អ្នក",

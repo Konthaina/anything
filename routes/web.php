@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('feed/{post}/comments', [CommentController::class, 'store'])->name('comments.store');
     Route::delete('feed/{post}', [FeedController::class, 'destroy'])->name('feed.destroy');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::get('profiles', [UserProfileController::class, 'index'])->name('profiles.index');
     Route::get('profiles/{user}', [UserProfileController::class, 'show'])->name('profiles.show');
     Route::post('profiles/{user}/follow', [FollowController::class, 'follow'])->name('profiles.follow');
     Route::delete('profiles/{user}/follow', [FollowController::class, 'unfollow'])->name('profiles.unfollow');
