@@ -41,6 +41,36 @@ it('renders the feed page with image urls', function () {
         );
 });
 
+it('includes verified status for shared post authors', function () {
+    $author = User::factory()->create([
+        'is_verified' => true,
+    ]);
+    $sharer = User::factory()->create([
+        'is_verified' => false,
+    ]);
+    $original = Post::factory()->for($author)->create([
+        'visibility' => 'public',
+        'created_at' => now()->subMinute(),
+    ]);
+    $shared = Post::factory()->for($sharer)->create([
+        'shared_post_id' => $original->id,
+        'visibility' => 'public',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($sharer)
+        ->get(route('feed.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('posts.data', 2)
+            ->where('posts.data.0.id', $shared->id)
+            ->where('posts.data.0.user.is_verified', false)
+            ->where('posts.data.0.shared_post.id', $original->id)
+            ->where('posts.data.0.shared_post.user.id', $author->id)
+            ->where('posts.data.0.shared_post.user.is_verified', true)
+        );
+});
+
 it('shows follower-only posts to followers but not to non-followers', function () {
     $author = User::factory()->create();
     $follower = User::factory()->create();

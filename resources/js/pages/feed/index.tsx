@@ -1110,24 +1110,47 @@ export function PostCard({
     return (
         <Card className="overflow-hidden border-border bg-card text-foreground shadow-2xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
-                <Link
-                    href={showProfile(post.user.id)}
-                    className="flex items-start gap-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
-                >
-                    <Avatar className="h-11 w-11">
-                        <AvatarImage src={post.user.avatar ?? undefined} alt={post.user.name} />
-                        <AvatarFallback className="bg-muted text-foreground">
-                            {getInitials(post.user.name)}
-                        </AvatarFallback>
-                    </Avatar>
+                <div className="flex items-start gap-3">
+                    <Link
+                        href={showProfile(post.user.id)}
+                        className="rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+                    >
+                        <Avatar className="h-11 w-11">
+                            <AvatarImage src={post.user.avatar ?? undefined} alt={post.user.name} />
+                            <AvatarFallback className="bg-muted text-foreground">
+                                {getInitials(post.user.name)}
+                            </AvatarFallback>
+                        </Avatar>
+                    </Link>
 
                     <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                            <div className="text-sm font-semibold leading-tight">{post.user.name}</div>
-                            {post.user.is_verified && (
-                                <span className="inline-flex items-center justify-center rounded-full bg-sky-100 p-1 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                                    <BadgeCheck className="h-3.5 w-3.5" />
-                                </span>
+                        <div className="flex flex-wrap items-center gap-2 text-sm font-semibold leading-tight text-foreground">
+                            <Link
+                                href={showProfile(post.user.id)}
+                                className="inline-flex items-center gap-2 text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+                            >
+                                <span>{post.user.name}</span>
+                                {post.user.is_verified && (
+                                    <span className="inline-flex items-center justify-center rounded-full bg-sky-100 p-1 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                        <BadgeCheck className="h-3.5 w-3.5" />
+                                    </span>
+                                )}
+                            </Link>
+                            {sharedPost && (
+                                <>
+                                    <Share2 className="h-3 w-3 text-muted-foreground" />
+                                    <Link
+                                        href={showProfile(sharedPost.user.id)}
+                                        className="inline-flex items-center gap-1 text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+                                    >
+                                        <span>{sharedPost.user.name}</span>
+                                        {sharedPost.user.is_verified && (
+                                        <span className="inline-flex items-center justify-center rounded-full bg-sky-100 p-1 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                            <BadgeCheck className="h-3.5 w-3.5" />
+                                        </span>
+                                    )}
+                                    </Link>
+                                </>
                             )}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1136,7 +1159,7 @@ export function PostCard({
                             <span>{visibilityLabel}</span>
                         </div>
                     </div>
-                </Link>
+                </div>
 
                 {isAuthor && (
                     <DropdownMenu>
@@ -1179,22 +1202,6 @@ export function PostCard({
             <CardContent className="space-y-3 text-sm leading-relaxed text-foreground">
                 {sharedPost ? (
                     <>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Link
-                                href={showProfile(post.user.id)}
-                                className="font-semibold text-foreground underline-offset-4 hover:underline"
-                            >
-                                {post.user.name}
-                            </Link>
-                            <Share2 className="h-3 w-3 text-muted-foreground" />
-                            <Link
-                                href={showProfile(sharedPost.user.id)}
-                                className="font-semibold text-foreground underline-offset-4 hover:underline"
-                            >
-                                {sharedPost.user.name}
-                            </Link>
-                        </div>
-
                         {hasContent &&
                             contentLines.map((line, idx) => (
                                 <p key={`share-content-${idx}`}>{renderLineWithLinks(line, idx)}</p>
@@ -2104,8 +2111,13 @@ function SharedPostPreview({
                 </Avatar>
 
                 <div className="flex flex-col">
-                    <div className="text-sm font-semibold leading-tight text-foreground">
-                        {post.user.name}
+                    <div className="flex items-center gap-2 text-sm font-semibold leading-tight text-foreground">
+                        <span>{post.user.name}</span>
+                        {post.user.is_verified && (
+                            <span className="inline-flex items-center justify-center rounded-full bg-sky-100 p-1 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                <BadgeCheck className="h-3.5 w-3.5" />
+                            </span>
+                        )}
                     </div>
                     <div className="text-xs text-muted-foreground">{timestamp}</div>
                 </div>
