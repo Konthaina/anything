@@ -428,28 +428,12 @@ export default function FeedPage() {
         setLiveUnreadNotifications(unreadNotificationCount);
     }, [unreadNotificationCount]);
 
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const handleScroll = () => {
-            setShowScrollTop(window.scrollY > 400);
-        };
-
-        handleScroll();
-        window.addEventListener('scroll', handleScroll, { passive: true });
-
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, []);
-
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [{ title: t('feed.title'), href: '/feed' }],
         [t],
     );
 
     const getInitials = useInitials();
-    const pendingPostsCount = pendingPosts.length;
 
     const shouldDeferInsert = useCallback(() => {
         if (typeof window === 'undefined') {
@@ -513,7 +497,7 @@ export default function FeedPage() {
         [handleIncomingPost],
     );
 
-    const handleShowPendingPosts = useCallback(() => {
+    const flushPendingPosts = useCallback(() => {
         if (pendingPosts.length === 0) {
             return;
         }
@@ -529,11 +513,26 @@ export default function FeedPage() {
 
             return [...toInsert, ...current];
         });
-
-        if (typeof window !== 'undefined') {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
     }, [pendingPosts]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleScroll = () => {
+            setShowScrollTop(window.scrollY > 400);
+
+            if (pendingPosts.length > 0 && window.scrollY <= 80) {
+                flushPendingPosts();
+            }
+        };
+
+        handleScroll();
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, [flushPendingPosts, pendingPosts.length]);
 
     useEffect(() => {
         const echo = getEchoInstance();
@@ -768,18 +767,6 @@ export default function FeedPage() {
                         </WhenVisible>
                     )}
                 </div>
-
-                {pendingPostsCount > 0 && (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full px-5 text-xs font-semibold shadow-lg"
-                        onClick={handleShowPendingPosts}
-                    >
-                        {t('feed.new_posts', { count: pendingPostsCount })}
-                    </Button>
-                )}
 
                 {auth?.user && (
                     <NotificationFloatingButton

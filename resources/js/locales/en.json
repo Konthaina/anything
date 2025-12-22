@@ -345,7 +345,6 @@
         "mark_all_read": "Mark all read",
         "no_notifications": "You're all caught up!",
         "notifications_description": "Latest activity on your posts.",
-        "new_posts": "New posts ({count})",
         "scroll_to_top": "Scroll to top"
     }
 }
