@@ -1451,47 +1451,28 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         content: string;
         images: File[];
         remove_image: boolean;
-        video: File | null;
-        remove_video: boolean;
         visibility: VisibilityValue;
     }>({
         content: post.content ?? '',
         images: [] as File[],
         remove_image: false,
-        video: null,
-        remove_video: false,
         visibility: defaultVisibility,
     });
 
     const { setData, clearErrors } = form;
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
-    const [videoPreview, setVideoPreview] = useState<string | null>(null);
-    const videoPreviewRef = useRef<string | null>(null);
     const [, rerender] = useState(0);
     const bump = () => rerender((v) => v + 1);
-
-    const clearVideoPreview = () => {
-        if (videoPreviewRef.current) {
-            URL.revokeObjectURL(videoPreviewRef.current);
-            videoPreviewRef.current = null;
-        }
-        setVideoPreview(null);
-    };
 
     useEffect(() => {
         // reset form fields when switching post or opening dialog
         setData('content', post.content ?? '');
         setData('images', []);
         setData('remove_image', false);
-        setData('video', null);
-        setData('remove_video', false);
         setData('visibility', defaultVisibility);
         clearErrors();
 
         hiddenPreviewRef.current = new Set();
-        clearVideoPreview();
-
-        return () => clearVideoPreview();
 
         // NOTE: do not bump here (lint rule)
         // re-render will happen anyway when open/post.id changes
@@ -1501,37 +1482,18 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        form.put(`/feed/${post.id}`, {
+        form.transform((data) => ({
+            ...data,
+            _method: 'put',
+        }));
+
+        form.post(`/feed/${post.id}`, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 onOpenChange(false);
             },
         });
-    };
-
-    const handleVideoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const [file] = event.target.files ?? [];
-        form.setData('video', file ?? null);
-
-        clearVideoPreview();
-
-        if (!file) return;
-
-        form.setData('remove_video', false);
-        const url = URL.createObjectURL(file);
-        videoPreviewRef.current = url;
-        setVideoPreview(url);
-    };
-
-    const handleClearVideoSelection = () => {
-        form.setData('video', null);
-        clearVideoPreview();
-    };
-
-    const handleRemoveExistingVideo = () => {
-        form.setData('remove_video', true);
-        form.setData('video', null);
-        clearVideoPreview();
     };
 
     const isSharePost = Boolean(post.shared_post);
@@ -1540,8 +1502,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
 
     const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewRef.current.has(url));
     const existingVideoUrl = post.video_url ?? null;
-    const showExistingVideo = Boolean(existingVideoUrl) && !form.data.remove_video && !videoPreview;
-    const activeVideoUrl = videoPreview ?? (showExistingVideo ? existingVideoUrl : null);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1605,10 +1565,10 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
 
                     {!isSharePost && (
                         <div className="space-y-3">
-                            {activeVideoUrl && (
+                            {existingVideoUrl && (
                                 <div className="overflow-hidden rounded-xl border border-border">
                                     <video
-                                        src={activeVideoUrl}
+                                        src={existingVideoUrl}
                                         controls
                                         playsInline
                                         preload="metadata"
@@ -1616,50 +1576,6 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                                     />
                                 </div>
                             )}
-
-                            <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <VideoIcon className="h-4 w-4" />
-                                    <span>{t('feed.attach_video')}</span>
-                                </div>
-                                <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-2 py-1.5 text-[11px] font-semibold text-secondary-foreground transition hover:opacity-90">
-                                    <span>{t('feed.browse')}</span>
-                                    <input
-                                        type="file"
-                                        name="video"
-                                        accept="video/mp4,video/webm,video/quicktime"
-                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                        onChange={handleVideoChange}
-                                    />
-                                </label>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {videoPreview && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs"
-                                        onClick={handleClearVideoSelection}
-                                    >
-                                        {t('feed.clear_selection')}
-                                    </Button>
-                                )}
-                                {!videoPreview && existingVideoUrl && !form.data.remove_video && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs"
-                                        onClick={handleRemoveExistingVideo}
-                                    >
-                                        {t('feed.remove_video')}
-                                    </Button>
-                                )}
-                            </div>
-
-                            <InputError message={form.errors.video} />
                         </div>
                     )}
 

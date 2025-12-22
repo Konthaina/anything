@@ -40,12 +40,12 @@ export function AppSidebar() {
         () => [
             {
                 title: t('nav.repository'),
-                href: 'https://github.com/laravel/react-starter-kit',
+                href: 'https://github.com/Konthaina/anything',
                 icon: Folder,
             },
             {
                 title: t('nav.documentation'),
-                href: 'https://laravel.com/docs/starter-kits#react',
+                href: 'https://github.com/Konthaina/anything/blob/main/README.md',
                 icon: BookOpen,
             },
         ],

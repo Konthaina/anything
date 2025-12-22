@@ -87,6 +87,37 @@ it('stores uploaded videos when creating a post', function () {
     Storage::disk('public')->assertExists($post->video_path);
 });
 
+it('updates the video when editing a post', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $oldPath = 'posts/videos/old.mp4';
+    Storage::disk('public')->put($oldPath, 'old-video');
+
+    $post = Post::factory()->for($user)->create([
+        'video_path' => $oldPath,
+        'visibility' => 'public',
+    ]);
+
+    $video = UploadedFile::fake()->create('replacement.mp4', 1024, 'video/mp4');
+
+    $this->actingAs($user)
+        ->from(route('feed.index', absolute: false))
+        ->post(route('feed.update', $post), [
+            '_method' => 'put',
+            'content' => 'Updated video content',
+            'visibility' => 'public',
+            'video' => $video,
+        ])
+        ->assertRedirect(route('feed.index', absolute: false));
+
+    $post->refresh();
+
+    expect($post->video_path)->not->toBe($oldPath);
+    Storage::disk('public')->assertMissing($oldPath);
+    Storage::disk('public')->assertExists($post->video_path);
+});
+
 it('includes verified status for shared post authors', function () {
     $author = User::factory()->create([
         'is_verified' => true,
