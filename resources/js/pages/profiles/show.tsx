@@ -13,7 +13,6 @@ import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileCo
 import InputError from '@/components/input-error';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { CreatePostCard, PostCard, type FeedPost } from '@/pages/feed/index';
@@ -21,7 +20,7 @@ import { follow, show as showProfile, unfollow } from '@/routes/profiles';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Form, Head, router, usePage, WhenVisible } from '@inertiajs/react';
 import { useI18n } from '@/contexts/language-context';
-import { BadgeCheck, Github, Pencil } from 'lucide-react';
+import { BadgeCheck, Github, Image as ImageIcon, Pencil } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { getEchoInstance } from '@/lib/echo-client';
 
@@ -261,6 +260,12 @@ export default function ProfileShow() {
         return appendCacheBuster(profileUser.cover ?? null, updatedAt);
     }, [coverPreview, profileUser.cover, updatedAt]);
 
+    const coverPlaceholder = (
+        <div className="h-full w-full bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_70%)] dark:bg-[linear-gradient(180deg,#0f172a_0%,#111827_70%)]">
+            <div className="h-full w-full bg-[repeating-linear-gradient(135deg,rgba(15,23,42,0.08)_0_6px,rgba(15,23,42,0.02)_6px_12px)] dark:bg-[repeating-linear-gradient(135deg,rgba(148,163,184,0.12)_0_6px,rgba(15,23,42,0)_6px_12px)]" />
+        </div>
+    );
+
     const breadcrumbs: BreadcrumbItem[] = useMemo(
         () => [
             { title: t('profile_page.title'), href: showProfile(profileUser.id).url },
@@ -273,14 +278,14 @@ export default function ProfileShow() {
             <Head title={`${profileUser.name} · ${t('profile_page.title')}`} />
 
             <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 pb-10">
-                <Card className="border-border bg-card text-foreground shadow-xl">
-                    <CardHeader className="space-y-4">
+                <Card className="overflow-hidden border-border bg-card text-foreground shadow-xl gap-0 py-0">
+                    <CardHeader className="gap-0 p-0">
                         {isSelf ? (
                             <Form
                                 {...ProfileController.update.form()}
                                 options={{ preserveScroll: true }}
                                 encType="multipart/form-data"
-                                className="space-y-4"
+                                className="space-y-0"
                                 onSuccess={() => {
                                     resetProfileMediaPreviews();
                                 }}
@@ -298,8 +303,8 @@ export default function ProfileShow() {
                                             defaultValue={auth?.user?.email}
                                         />
 
-                                        <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/10">
-                                            <div className="h-36 w-full sm:h-44">
+                                        <div className="relative overflow-hidden border-b border-border/70 bg-muted/10">
+                                            <div className="h-32 w-full sm:h-40">
                                                 {coverSrc ? (
                                                     <img
                                                         src={coverSrc}
@@ -307,10 +312,11 @@ export default function ProfileShow() {
                                                         className="h-full w-full object-cover"
                                                     />
                                                 ) : (
-                                                    <PlaceholderPattern className="size-full stroke-foreground/10" />
+                                                    coverPlaceholder
                                                 )}
                                             </div>
-                                            <label className="absolute right-3 top-3 inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-background">
+                                            <label className="absolute right-4 top-4 inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-background">
+                                                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
                                                 {t('profile_page.cover_change')}
                                                 <Input
                                                     type="file"
@@ -322,11 +328,11 @@ export default function ProfileShow() {
                                             </label>
                                         </div>
 
-                                        <div className="relative -mt-8 flex flex-col gap-4 sm:-mt-10">
-                                            <div className="flex flex-wrap items-end justify-between gap-4">
+                                        <div className="relative flex flex-col gap-6 px-4 pb-5 sm:px-6">
+                                            <div className="-mt-10 flex flex-wrap items-end justify-between gap-4">
                                                 <div className="flex items-end gap-4">
                                                     <label className="relative cursor-pointer">
-                                                        <Avatar className="h-20 w-20 ring-2 ring-background sm:h-24 sm:w-24">
+                                                        <Avatar className="h-24 w-24 ring-4 ring-background shadow-lg sm:h-28 sm:w-28">
                                                             <AvatarImage
                                                                 src={avatarSrc ?? undefined}
                                                                 alt={profileUser.name}
@@ -344,12 +350,12 @@ export default function ProfileShow() {
                                                         />
                                                     </label>
                                                     <div className="space-y-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <CardTitle className="text-xl font-semibold">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <CardTitle className="text-2xl font-semibold">
                                                                 {profileUser.name}
                                                             </CardTitle>
                                                             {profileUser.is_verified && (
-                                                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 shadow-sm dark:bg-sky-500/10 dark:text-sky-300">
                                                                     <BadgeCheck className="h-3.5 w-3.5" />
                                                                     {t('profile_page.verified')}
                                                                 </span>
@@ -381,114 +387,112 @@ export default function ProfileShow() {
                                                 )}
                                             </div>
 
-                                            <div className="w-full">
-                                                <div className="flex items-center gap-2">
-                                                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                        {t('profile_page.bio_label')}
-                                                    </label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (isEditingBio) {
-                                                                setIsEditingBio(false);
-                                                                setBioDraft(null);
-                                                                return;
-                                                            }
+                                            <div className="grid gap-5">
+                                                <div className="w-full">
+                                                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        <label>{t('profile_page.bio_label')}</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (isEditingBio) {
+                                                                    setIsEditingBio(false);
+                                                                    setBioDraft(null);
+                                                                    return;
+                                                                }
 
-                                                            setIsEditingBio(true);
-                                                            setBioDraft(profileUser.bio ?? '');
-                                                        }}
-                                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                                                        aria-label={t('common.edit')}
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                                {isEditingBio ? (
-                                                    <>
-                                                        <textarea
-                                                            name="bio"
-                                                            value={bioDraft ?? ''}
-                                                            onChange={(event) =>
-                                                                setBioDraft(event.target.value)
-                                                            }
-                                                            rows={4}
-                                                            placeholder={t('profile_page.bio_placeholder')}
-                                                            className="no-scrollbar mt-2 w-full resize-none overflow-auto rounded-lg bg-muted/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
-                                                        />
-                                                        <p className="mt-2 text-[11px] text-muted-foreground">
-                                                            {t('profile_page.bio_limit')}
+                                                                setIsEditingBio(true);
+                                                                setBioDraft(profileUser.bio ?? '');
+                                                            }}
+                                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                                            aria-label={t('common.edit')}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    {isEditingBio ? (
+                                                        <>
+                                                            <textarea
+                                                                name="bio"
+                                                                value={bioDraft ?? ''}
+                                                                onChange={(event) =>
+                                                                    setBioDraft(event.target.value)
+                                                                }
+                                                                rows={4}
+                                                                placeholder={t('profile_page.bio_placeholder')}
+                                                                className="no-scrollbar mt-2 w-full resize-none overflow-auto rounded-lg bg-muted/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                                                            />
+                                                            <p className="mt-2 text-[11px] text-muted-foreground">
+                                                                {t('profile_page.bio_limit')}
+                                                            </p>
+                                                            <InputError className="mt-1" message={errors.bio} />
+                                                        </>
+                                                    ) : (
+                                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                                                            {renderBioContent(
+                                                                profileUser.bio ?? '',
+                                                                t('profile_page.bio_placeholder'),
+                                                            )}
                                                         </p>
-                                                        <InputError className="mt-1" message={errors.bio} />
-                                                    </>
-                                                ) : (
-                                                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                                                        {renderBioContent(
-                                                            profileUser.bio ?? '',
-                                                            t('profile_page.bio_placeholder'),
-                                                        )}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div className="w-full">
-                                                <div className="flex items-center gap-2">
-                                                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                        <Github className="h-3.5 w-3.5" />
-                                                        {t('profile_page.github_label')}
-                                                    </label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (isEditingGithub) {
-                                                                setIsEditingGithub(false);
-                                                                setGithubDraft(null);
-                                                                return;
-                                                            }
-
-                                                            setIsEditingGithub(true);
-                                                            setGithubDraft(profileUser.github_url ?? '');
-                                                        }}
-                                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                                                        aria-label={t('common.edit')}
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </button>
+                                                    )}
                                                 </div>
-                                                {isEditingGithub ? (
-                                                    <>
-                                                        <Input
-                                                            type="url"
-                                                            name="github_url"
-                                                            value={githubDraft ?? ''}
-                                                            onChange={(event) =>
-                                                                setGithubDraft(event.target.value)
-                                                            }
-                                                            placeholder={t('profile_page.github_placeholder')}
-                                                            className="mt-2"
-                                                        />
-                                                        <InputError
-                                                            className="mt-1"
-                                                            message={errors.github_url}
-                                                        />
-                                                    </>
-                                                ) : profileUser.github_url ? (
-                                                    <a
-                                                        href={profileUser.github_url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
-                                                    >
-                                                        {profileUser.github_url}
-                                                    </a>
-                                                ) : (
-                                                    <p className="mt-2 text-sm text-muted-foreground">
-                                                        {t('profile_page.github_empty')}
-                                                    </p>
-                                                )}
+
+                                                <div className="w-full">
+                                                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                        <Github className="h-3.5 w-3.5" />
+                                                        <label>{t('profile_page.github_label')}</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (isEditingGithub) {
+                                                                    setIsEditingGithub(false);
+                                                                    setGithubDraft(null);
+                                                                    return;
+                                                                }
+
+                                                                setIsEditingGithub(true);
+                                                                setGithubDraft(profileUser.github_url ?? '');
+                                                            }}
+                                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                                            aria-label={t('common.edit')}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    {isEditingGithub ? (
+                                                        <>
+                                                            <Input
+                                                                type="url"
+                                                                name="github_url"
+                                                                value={githubDraft ?? ''}
+                                                                onChange={(event) =>
+                                                                    setGithubDraft(event.target.value)
+                                                                }
+                                                                placeholder={t('profile_page.github_placeholder')}
+                                                                className="mt-2"
+                                                            />
+                                                            <InputError
+                                                                className="mt-1"
+                                                                message={errors.github_url}
+                                                            />
+                                                        </>
+                                                    ) : profileUser.github_url ? (
+                                                        <a
+                                                            href={profileUser.github_url}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+                                                        >
+                                                            {profileUser.github_url}
+                                                        </a>
+                                                    ) : (
+                                                        <p className="mt-2 text-sm text-muted-foreground">
+                                                            {t('profile_page.github_empty')}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
+                                            <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-4 text-sm">
                                                 <ProfileStat
                                                     label={t('profile_page.posts')}
                                                     value={profileUser.posts_count ?? postsCount}
@@ -503,7 +507,7 @@ export default function ProfileShow() {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="grid gap-1 text-xs text-destructive">
+                                        <div className="grid gap-1 px-4 pb-5 text-xs text-destructive sm:px-6">
                                             <InputError message={errors.avatar} />
                                             <InputError message={errors.cover} />
                                         </div>
@@ -512,8 +516,8 @@ export default function ProfileShow() {
                             </Form>
                         ) : (
                             <>
-                                <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/10">
-                                    <div className="h-36 w-full sm:h-44">
+                                <div className="relative overflow-hidden border-b border-border/70 bg-muted/10">
+                                    <div className="h-32 w-full sm:h-40">
                                         {coverSrc ? (
                                             <img
                                                 src={coverSrc}
@@ -521,15 +525,15 @@ export default function ProfileShow() {
                                                 className="h-full w-full object-cover"
                                             />
                                         ) : (
-                                            <PlaceholderPattern className="size-full stroke-foreground/10" />
+                                            coverPlaceholder
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="relative -mt-8 flex flex-col gap-4 sm:-mt-10">
-                                    <div className="flex flex-wrap items-end justify-between gap-4">
+                                <div className="relative flex flex-col gap-6 px-4 pb-5 sm:px-6">
+                                    <div className="-mt-10 flex flex-wrap items-end justify-between gap-4">
                                         <div className="flex items-end gap-4">
-                                            <Avatar className="h-20 w-20 ring-2 ring-background sm:h-24 sm:w-24">
+                                            <Avatar className="h-24 w-24 ring-4 ring-background shadow-lg sm:h-28 sm:w-28">
                                                 <AvatarImage
                                                     src={avatarSrc ?? undefined}
                                                     alt={profileUser.name}
@@ -539,12 +543,12 @@ export default function ProfileShow() {
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <CardTitle className="text-xl font-semibold">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <CardTitle className="text-2xl font-semibold">
                                                         {profileUser.name}
                                                     </CardTitle>
                                                     {profileUser.is_verified && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700 shadow-sm dark:bg-sky-500/10 dark:text-sky-300">
                                                             <BadgeCheck className="h-3.5 w-3.5" />
                                                             {t('profile_page.verified')}
                                                         </span>
@@ -597,34 +601,36 @@ export default function ProfileShow() {
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="w-full">
-                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                            {t('profile_page.bio_label')}
-                                        </div>
-                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                                            {renderBioContent(
-                                                profileUser.bio ?? '',
-                                                t('profile_page.bio_placeholder'),
-                                            )}
-                                        </p>
-                                    </div>
-                                    {profileUser.github_url && (
+                                    <div className="grid gap-5">
                                         <div className="w-full">
-                                            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                <Github className="h-3.5 w-3.5" />
-                                                {t('profile_page.github_label')}
+                                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {t('profile_page.bio_label')}
                                             </div>
-                                            <a
-                                                href={profileUser.github_url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
-                                            >
-                                                {profileUser.github_url}
-                                            </a>
+                                            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                                                {renderBioContent(
+                                                    profileUser.bio ?? '',
+                                                    t('profile_page.bio_placeholder'),
+                                                )}
+                                            </p>
                                         </div>
-                                    )}
-                                    <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-3 text-sm">
+                                        {profileUser.github_url && (
+                                            <div className="w-full">
+                                                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    <Github className="h-3.5 w-3.5" />
+                                                    {t('profile_page.github_label')}
+                                                </div>
+                                                <a
+                                                    href={profileUser.github_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-2 inline-flex items-center break-words text-sm text-blue-500 underline transition hover:text-blue-400 dark:text-blue-300"
+                                                >
+                                                    {profileUser.github_url}
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-6 border-t border-border/60 pt-4 text-sm">
                                         <ProfileStat
                                             label={t('profile_page.posts')}
                                             value={profileUser.posts_count ?? postsCount}
@@ -738,8 +744,8 @@ export default function ProfileShow() {
 function ProfileStat({ label, value }: { label: string; value: number }) {
     return (
         <div className="flex flex-col items-start">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-            <span className="text-lg font-semibold text-foreground">{value}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+            <span className="text-xl font-semibold text-foreground">{value}</span>
         </div>
     );
 }
