@@ -1630,7 +1630,7 @@ export function PostCard({
                     </>
                 )}
 
-                <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                <div className="pt-3 text-xs text-muted-foreground">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[0.75rem]">
                         <span className="font-semibold text-foreground">
                             {formatCount(likesCount)} {t('feed.like')}
