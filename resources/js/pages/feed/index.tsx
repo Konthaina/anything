@@ -364,6 +364,11 @@ function canViewPostForUser(
 }
 
 const MAX_IMAGES = 7;
+const ACCEPTED_VIDEO_TYPES = new Set([
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+]);
 
 export default function FeedPage() {
     const page = usePage<
@@ -800,6 +805,10 @@ export function CreatePostCard({
     const [videoPreview, setVideoPreview] = useState<string | null>(null);
     const videoPreviewRef = useRef<string | null>(null);
     const [visibility, setVisibility] = useState<VisibilityValue>('public');
+    const imageDragCounterRef = useRef(0);
+    const videoDragCounterRef = useRef(0);
+    const [isImageDragActive, setIsImageDragActive] = useState(false);
+    const [isVideoDragActive, setIsVideoDragActive] = useState(false);
 
     const cleanupImagePreviews = useCallback(() => {
         previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -849,6 +858,32 @@ export function CreatePostCard({
                 }}
             >
                 {({ setData, processing, errors, reset }) => {
+                    const updateImageSelection = (files: File[]) => {
+                        const filtered = files
+                            .filter((file) => file.type.startsWith('image/'))
+                            .slice(0, MAX_IMAGES);
+
+                        if (filtered.length === 0) return;
+
+                        setData?.('images', filtered);
+                        cleanupImagePreviews();
+
+                        const urls = filtered.map((file) => URL.createObjectURL(file));
+                        previewUrlsRef.current = urls;
+                        setPreviews(urls);
+                    };
+
+                    const updateVideoSelection = (file?: File) => {
+                        if (!file || !ACCEPTED_VIDEO_TYPES.has(file.type)) return;
+
+                        setData?.('video', file);
+                        cleanupVideoPreview();
+
+                        const url = URL.createObjectURL(file);
+                        videoPreviewRef.current = url;
+                        setVideoPreview(url);
+                    };
+
                     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
                         const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
                         setData?.('images', files);
@@ -875,6 +910,70 @@ export function CreatePostCard({
                         setVideoPreview(url);
                     };
 
+                    const handleImageDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.dataTransfer.dropEffect = 'copy';
+                    };
+
+                    const handleImageDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        imageDragCounterRef.current += 1;
+                        setIsImageDragActive(true);
+                    };
+
+                    const handleImageDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        imageDragCounterRef.current = Math.max(0, imageDragCounterRef.current - 1);
+                        if (imageDragCounterRef.current === 0) {
+                            setIsImageDragActive(false);
+                        }
+                    };
+
+                    const handleImageDrop = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        imageDragCounterRef.current = 0;
+                        setIsImageDragActive(false);
+
+                        const files = Array.from(event.dataTransfer.files ?? []);
+                        updateImageSelection(files);
+                    };
+
+                    const handleVideoDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.dataTransfer.dropEffect = 'copy';
+                    };
+
+                    const handleVideoDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        videoDragCounterRef.current += 1;
+                        setIsVideoDragActive(true);
+                    };
+
+                    const handleVideoDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        videoDragCounterRef.current = Math.max(0, videoDragCounterRef.current - 1);
+                        if (videoDragCounterRef.current === 0) {
+                            setIsVideoDragActive(false);
+                        }
+                    };
+
+                    const handleVideoDrop = (event: React.DragEvent<HTMLDivElement>) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        videoDragCounterRef.current = 0;
+                        setIsVideoDragActive(false);
+
+                        const [file] = Array.from(event.dataTransfer.files ?? []);
+                        updateVideoSelection(file);
+                    };
+
                     return (
                         <>
                             <CardContent className="space-y-4">
@@ -891,7 +990,16 @@ export function CreatePostCard({
                                 />
                                 <InputError message={errors.content} />
 
-                                <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                                <div
+                                    className={cn(
+                                        'flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 transition',
+                                        isImageDragActive && 'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
+                                    )}
+                                    onDragOver={handleImageDragOver}
+                                    onDragEnter={handleImageDragEnter}
+                                    onDragLeave={handleImageDragLeave}
+                                    onDrop={handleImageDrop}
+                                >
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ImageIcon className="h-4 w-4" />
                                         <span>{t('feed.attach_image')}</span>
@@ -921,7 +1029,16 @@ export function CreatePostCard({
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                                <div
+                                    className={cn(
+                                        'flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 transition',
+                                        isVideoDragActive && 'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
+                                    )}
+                                    onDragOver={handleVideoDragOver}
+                                    onDragEnter={handleVideoDragEnter}
+                                    onDragLeave={handleVideoDragLeave}
+                                    onDrop={handleVideoDrop}
+                                >
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <VideoIcon className="h-4 w-4" />
                                         <span>{t('feed.attach_video')}</span>

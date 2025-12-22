@@ -65,6 +65,33 @@ it('renders the feed page with video url', function () {
         );
 });
 
+it('stores uploaded images when creating a post', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $images = [
+        UploadedFile::fake()->image('first.jpg'),
+        UploadedFile::fake()->image('second.jpg'),
+    ];
+
+    $this->actingAs($user)
+        ->from(route('feed.index', absolute: false))
+        ->post(route('feed.store'), [
+            'content' => 'Photo post',
+            'visibility' => 'public',
+            'images' => $images,
+        ])
+        ->assertRedirect(route('feed.index', absolute: false));
+
+    $post = Post::query()->firstOrFail();
+
+    expect($post->image_paths)->toHaveCount(2);
+
+    foreach ($post->image_paths as $path) {
+        Storage::disk('public')->assertExists($path);
+    }
+});
+
 it('stores uploaded videos when creating a post', function () {
     Storage::fake('public');
 
