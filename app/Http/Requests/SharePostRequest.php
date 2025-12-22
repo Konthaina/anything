@@ -23,6 +23,7 @@ class SharePostRequest extends FormRequest
     {
         return [
             'content' => ['nullable', 'string', 'max:2000'],
+            'visibility' => ['nullable', 'string', 'in:public,followers'],
         ];
     }
 
@@ -35,6 +36,7 @@ class SharePostRequest extends FormRequest
     {
         return [
             'content.max' => 'Share content may not be greater than 2000 characters.',
+            'visibility.in' => 'Visibility must be public or followers only.',
         ];
     }
 }

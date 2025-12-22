@@ -219,6 +219,30 @@ it('broadcasts a PostUpdated event when a user edits a post', function () {
     });
 });
 
+it('allows updating visibility for shared posts without content', function () {
+    $author = User::factory()->create();
+    $sharer = User::factory()->create();
+    $original = Post::factory()->for($author)->create([
+        'visibility' => 'public',
+    ]);
+    $shared = Post::factory()->for($sharer)->create([
+        'shared_post_id' => $original->id,
+        'content' => '',
+        'visibility' => 'public',
+    ]);
+
+    $this->actingAs($sharer)
+        ->from(route('feed.index', absolute: false))
+        ->put(route('feed.update', $shared), [
+            'content' => '',
+            'visibility' => 'followers',
+        ])
+        ->assertRedirect(route('feed.index', absolute: false))
+        ->assertSessionHasNoErrors();
+
+    expect($shared->refresh()->visibility)->toBe('followers');
+});
+
 it('broadcasts a PostDeleted event when a user deletes a post', function () {
     Event::fake([PostDeleted::class]);
 
@@ -398,7 +422,7 @@ it('returns json when sharing a post', function () {
         'shares_count' => 0,
     ]);
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->postJson(route('feed.share', $post), [
             'content' => 'Sharing from json',
         ])
@@ -409,6 +433,37 @@ it('returns json when sharing a post', function () {
         ]);
 
     expect($post->refresh()->shares_count)->toBe(1);
+
+    $sharedPost = Post::query()
+        ->where('shared_post_id', $post->id)
+        ->where('user_id', $user->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    $response->assertJsonPath('shared_post_id', $sharedPost->id);
+});
+
+it('stores shared posts with the provided visibility', function () {
+    $author = User::factory()->create();
+    $user = User::factory()->create();
+    $post = Post::factory()->for($author)->create([
+        'visibility' => 'public',
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('feed.share', $post), [
+            'content' => 'Followers only share',
+            'visibility' => 'followers',
+        ])
+        ->assertOk();
+
+    $shared = Post::query()
+        ->where('shared_post_id', $post->id)
+        ->where('user_id', $user->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($shared->visibility)->toBe('followers');
 });
 
 it('returns json when creating a comment', function () {

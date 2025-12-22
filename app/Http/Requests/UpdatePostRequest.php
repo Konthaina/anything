@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdatePostRequest extends FormRequest
 {
@@ -30,8 +31,11 @@ class UpdatePostRequest extends FormRequest
      */
     public function rules(): array
     {
+        $post = $this->route('post');
+        $requiresContent = ! $post || ! $post->shared_post_id;
+
         return [
-            'content' => ['required', 'string', 'max:2000'],
+            'content' => [Rule::requiredIf($requiresContent), 'nullable', 'string', 'max:2000'],
             'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
             'images.*' => ['image', 'max:5120'],
             'remove_image' => ['nullable', 'boolean'],

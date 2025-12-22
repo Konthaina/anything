@@ -176,6 +176,7 @@ class FeedController extends Controller
         $data = $request->validated();
 
         $shareContent = trim((string) ($data['content'] ?? ''));
+        $shareVisibility = $data['visibility'] ?? null;
 
         $post->loadMissing('sharedPost');
         $shareTarget = $post->sharedPost ?? $post;
@@ -183,7 +184,7 @@ class FeedController extends Controller
 
         $sharedPost = null;
 
-        DB::transaction(function () use ($shareTarget, $shareContent, $user, $post, $resharingSharedPost, &$sharedPost): void {
+        DB::transaction(function () use ($shareTarget, $shareContent, $shareVisibility, $user, $post, $resharingSharedPost, &$sharedPost): void {
             $shareTarget->shares()->create([
                 'user_id' => $user->id,
             ]);
@@ -195,7 +196,7 @@ class FeedController extends Controller
 
             $sharedPost = $user->posts()->create([
                 'content' => $shareContent,
-                'visibility' => $shareTarget->visibility ?? 'public',
+                'visibility' => $shareVisibility ?? $shareTarget->visibility ?? 'public',
                 'image_paths' => [],
                 'video_path' => null,
                 'likes_count' => 0,
@@ -269,6 +270,7 @@ class FeedController extends Controller
     public function update(UpdatePostRequest $request, Post $post): RedirectResponse
     {
         $data = $request->validated();
+        $content = $data['content'] ?? $post->content ?? '';
 
         $imagePaths = $post->image_paths ?? [];
         $videoPath = $post->video_path;
@@ -297,7 +299,7 @@ class FeedController extends Controller
         }
 
         $post->update([
-            'content' => $data['content'],
+            'content' => $content,
             'image_paths' => $imagePaths,
             'video_path' => $videoPath,
             'visibility' => $data['visibility'],

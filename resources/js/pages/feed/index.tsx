@@ -1139,6 +1139,9 @@ export function PostCard({
     const [shareProcessing, setShareProcessing] = useState(false);
     const [shareContent, setShareContent] = useState('');
     const [shareError, setShareError] = useState<string | undefined>(undefined);
+    const defaultShareVisibility = (post.visibility ?? 'public') as VisibilityValue;
+    const [shareVisibility, setShareVisibility] = useState<VisibilityValue>(defaultShareVisibility);
+    const [shareVisibilityError, setShareVisibilityError] = useState<string | undefined>(undefined);
 
     const liked = optimisticLiked ?? liveLiked;
     const likesCount = optimisticLikesCount ?? liveLikesCount;
@@ -1252,10 +1255,16 @@ export function PostCard({
         if (shareProcessing) return;
         setShareDialogOpen(open);
 
-        if (!open) {
-            setShareContent('');
-            setShareError(undefined);
+        if (open) {
+            setShareVisibility(defaultShareVisibility);
+            setShareVisibilityError(undefined);
+            return;
         }
+
+        setShareContent('');
+        setShareError(undefined);
+        setShareVisibility(defaultShareVisibility);
+        setShareVisibilityError(undefined);
     };
 
     const handleShareNoteChange = (value: string) => {
@@ -1263,6 +1272,13 @@ export function PostCard({
 
         if (shareError) {
             setShareError(undefined);
+        }
+    };
+
+    const handleShareVisibilityChange = (value: VisibilityValue) => {
+        setShareVisibility(value);
+        if (shareVisibilityError) {
+            setShareVisibilityError(undefined);
         }
     };
 
@@ -1310,9 +1326,11 @@ export function PostCard({
         setShareProcessing(true);
         setLiveSharesCount(previousCount + 1);
         setShareError(undefined);
+        setShareVisibilityError(undefined);
 
         postJson<ShareResponse>(`/feed/${post.id}/share`, {
             content: shareContent,
+            visibility: shareVisibility,
         })
             .then((payload) => {
                 setHasShared(true);
@@ -1325,14 +1343,25 @@ export function PostCard({
                     onShareCreated?.(payload.post);
                 }
                 setShareContent('');
+                setShareVisibility(defaultShareVisibility);
                 setShareDialogOpen(false);
             })
             .catch((error) => {
                 setLiveSharesCount(previousCount);
-                setShareError(
-                    extractErrorMessage(error?.data as JsonErrorPayload | undefined, 'content') ||
-                        t('common.error'),
+                const contentError = extractErrorMessage(
+                    error?.data as JsonErrorPayload | undefined,
+                    'content',
                 );
+                const visibilityError = extractErrorMessage(
+                    error?.data as JsonErrorPayload | undefined,
+                    'visibility',
+                );
+
+                setShareError(
+                    contentError ??
+                        (visibilityError ? undefined : t('common.error')),
+                );
+                setShareVisibilityError(visibilityError);
             })
             .finally(() => setShareProcessing(false));
     };
@@ -1582,9 +1611,13 @@ export function PostCard({
                 onOpenChange={handleShareDialogChange}
                 value={shareContent}
                 onChange={handleShareNoteChange}
+                visibility={shareVisibility}
+                onVisibilityChange={handleShareVisibilityChange}
+                visibilityId={`share-visibility-${post.id}`}
                 onSubmit={handleShareSubmit}
                 submitting={shareProcessing}
                 error={shareError}
+                visibilityError={shareVisibilityError}
             />
 
             <ImageViewerDialog
@@ -2315,9 +2348,13 @@ interface ShareDialogProps {
     onOpenChange: (open: boolean) => void;
     value: string;
     onChange: (value: string) => void;
+    visibility: VisibilityValue;
+    onVisibilityChange: (value: VisibilityValue) => void;
+    visibilityId: string;
     onSubmit: () => void;
     submitting: boolean;
     error?: string;
+    visibilityError?: string;
 }
 
 function ShareDialog({
@@ -2325,9 +2362,13 @@ function ShareDialog({
     onOpenChange,
     value,
     onChange,
+    visibility,
+    onVisibilityChange,
+    visibilityId,
     onSubmit,
     submitting,
     error,
+    visibilityError,
 }: ShareDialogProps) {
     const { t } = useI18n();
 
@@ -2353,6 +2394,23 @@ function ShareDialog({
                         className="min-h-[120px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
                     />
                     <InputError message={error} />
+
+                    <div className="space-y-2">
+                        <label
+                            htmlFor={visibilityId}
+                            className="text-xs font-semibold text-muted-foreground"
+                        >
+                            {t('feed.visibility.label')}
+                        </label>
+                        <VisibilityDropdown
+                            id={visibilityId}
+                            name="visibility"
+                            value={visibility}
+                            onChange={onVisibilityChange}
+                            className="w-full justify-between"
+                        />
+                        <InputError message={visibilityError} />
+                    </div>
 
                     <DialogFooter className="flex flex-row gap-3">
                         <Button
