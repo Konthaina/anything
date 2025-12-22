@@ -40,6 +40,7 @@ class FeedPostPresenter
             'content' => $post->content,
             'visibility' => $post->visibility ?? 'public',
             'image_urls' => $post->image_urls,
+            'video_url' => $post->video_url,
             'likes_count' => $post->likes_count ?? 0,
             'comments_count' => $post->comments_count ?? 0,
             'shares_count' => $post->shares_count ?? 0,

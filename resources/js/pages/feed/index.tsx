@@ -44,6 +44,7 @@ import {
     Share2,
     Trash2,
     Users,
+    Video as VideoIcon,
     X,
     ZoomIn,
     ZoomOut,
@@ -63,6 +64,7 @@ export interface FeedPost {
     content: string;
     visibility?: 'public' | 'followers';
     image_urls?: string[];
+    video_url?: string | null;
     likes_count: number;
     comments_count: number;
     shares_count: number;
@@ -172,6 +174,7 @@ function normalizePost(post?: Partial<FeedPost>, includeShared = true): FeedPost
         content: post?.content ?? '',
         visibility: post?.visibility ?? 'public',
         image_urls: post?.image_urls ?? [],
+        video_url: post?.video_url ?? null,
         likes_count: post?.likes_count ?? 0,
         comments_count: post?.comments_count ?? 0,
         shares_count: post?.shares_count ?? 0,
@@ -571,6 +574,7 @@ export default function FeedPage() {
                 <div className="space-y-4">
                     {livePosts.map((post) => {
                         const imageSignature = (post.image_urls ?? []).join('|');
+                        const videoSignature = post.video_url ?? '';
                         const commentsSignature = (post.comments ?? [])
                             .map((comment) => comment.id)
                             .join('|');
@@ -581,9 +585,10 @@ export default function FeedPage() {
                             post.shares_count ?? 0,
                             commentsSignature,
                         ].join('|');
+                        const mediaSignature = `${videoSignature}-${imageSignature}`;
                         return (
                             <PostCard
-                                key={`${postSignature}-${imageSignature}`}
+                                key={`${postSignature}-${mediaSignature}`}
                                 post={post}
                                 getInitials={getInitials}
                                 authUserId={authUserId}
@@ -648,18 +653,32 @@ export function CreatePostCard({
     const [content, setContent] = useState<string>('');
     const [previews, setPreviews] = useState<string[]>([]);
     const previewUrlsRef = useRef<string[]>([]);
+    const [videoPreview, setVideoPreview] = useState<string | null>(null);
+    const videoPreviewRef = useRef<string | null>(null);
     const [visibility, setVisibility] = useState<VisibilityValue>('public');
 
-    const cleanupPreviews = () => {
+    const cleanupImagePreviews = useCallback(() => {
         previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
         previewUrlsRef.current = [];
         setPreviews([]);
-    };
+    }, []);
+
+    const cleanupVideoPreview = useCallback(() => {
+        if (videoPreviewRef.current) {
+            URL.revokeObjectURL(videoPreviewRef.current);
+            videoPreviewRef.current = null;
+        }
+        setVideoPreview(null);
+    }, []);
+
+    const cleanupPreviews = useCallback(() => {
+        cleanupImagePreviews();
+        cleanupVideoPreview();
+    }, [cleanupImagePreviews, cleanupVideoPreview]);
 
     useEffect(() => {
         return () => cleanupPreviews();
-
-    }, []);
+    }, [cleanupPreviews]);
 
     return (
         <Card className="border-border bg-card text-foreground shadow-xl">
@@ -690,13 +709,26 @@ export function CreatePostCard({
                         const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
                         setData?.('images', files);
 
-                        cleanupPreviews();
+                        cleanupImagePreviews();
 
                         if (files.length === 0) return;
 
                         const urls = files.map((file) => URL.createObjectURL(file));
                         previewUrlsRef.current = urls;
                         setPreviews(urls);
+                    };
+
+                    const handleVideoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                        const [file] = event.target.files ?? [];
+                        setData?.('video', file ?? null);
+
+                        cleanupVideoPreview();
+
+                        if (!file) return;
+
+                        const url = URL.createObjectURL(file);
+                        videoPreviewRef.current = url;
+                        setVideoPreview(url);
                     };
 
                     return (
@@ -744,6 +776,51 @@ export function CreatePostCard({
                                         ))}
                                     </div>
                                 )}
+
+                                <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <VideoIcon className="h-4 w-4" />
+                                        <span>{t('feed.attach_video')}</span>
+                                    </div>
+                                    <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
+                                        <span>{t('feed.browse')}</span>
+                                        <input
+                                            type="file"
+                                            name="video"
+                                            accept="video/mp4,video/webm,video/quicktime"
+                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                            onChange={handleVideoChange}
+                                        />
+                                    </label>
+                                </div>
+
+                                <InputError message={errors.video} />
+
+                                {videoPreview && (
+                                    <div className="space-y-2">
+                                        <div className="overflow-hidden rounded-xl border border-border">
+                                            <video
+                                                src={videoPreview}
+                                                controls
+                                                playsInline
+                                                preload="metadata"
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs"
+                                            onClick={() => {
+                                                cleanupVideoPreview();
+                                                setData?.('video', null);
+                                            }}
+                                        >
+                                            {t('feed.clear_selection')}
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
 
                             <CardFooter className="flex flex-wrap items-center justify-between gap-3 pt-4">
@@ -776,6 +853,7 @@ export function CreatePostCard({
                                             cleanupPreviews();
                                             setContent('');
                                             setData?.('images', []);
+                                            setData?.('video', null);
                                             setVisibility('public');
                                             setData?.('visibility', 'public');
                                         }}
@@ -927,6 +1005,7 @@ export function PostCard({
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
 
     const sanitizedImageUrls = useMemo(() => sanitizeImageUrls(post.image_urls), [post.image_urls]);
+    const videoUrl = post.video_url ?? null;
 
     const visibleImageUrls = sanitizedImageUrls.filter((url) => !hiddenImages.includes(url));
     const imageGridClass = resolveImageGridClass(visibleImageUrls.length);
@@ -1207,6 +1286,12 @@ export function PostCard({
                                 <p key={`share-content-${idx}`}>{renderLineWithLinks(line, idx)}</p>
                             ))}
 
+                        {videoUrl && (
+                            <div className="overflow-hidden rounded-2xl border border-border">
+                                <AutoPlayVideo src={videoUrl} />
+                            </div>
+                        )}
+
                         {visibleImageUrls.length > 0 && (
                             <div className={`grid w-full gap-2 ${imageGridClass}`}>
                                 {visibleImageUrls.map((url, index) => (
@@ -1242,6 +1327,12 @@ export function PostCard({
                         {contentLines.map((line, idx) => (
                             <p key={idx}>{renderLineWithLinks(line, idx)}</p>
                         ))}
+
+                        {videoUrl && (
+                            <div className="overflow-hidden rounded-2xl border border-border">
+                                <AutoPlayVideo src={videoUrl} />
+                            </div>
+                        )}
 
                         {visibleImageUrls.length > 0 && (
                             <div className={`grid w-full gap-2 ${imageGridClass}`}>
@@ -1360,28 +1451,47 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         content: string;
         images: File[];
         remove_image: boolean;
+        video: File | null;
+        remove_video: boolean;
         visibility: VisibilityValue;
     }>({
         content: post.content ?? '',
         images: [] as File[],
         remove_image: false,
+        video: null,
+        remove_video: false,
         visibility: defaultVisibility,
     });
 
     const { setData, clearErrors } = form;
     const hiddenPreviewRef = useRef<Set<string>>(new Set());
+    const [videoPreview, setVideoPreview] = useState<string | null>(null);
+    const videoPreviewRef = useRef<string | null>(null);
     const [, rerender] = useState(0);
     const bump = () => rerender((v) => v + 1);
+
+    const clearVideoPreview = () => {
+        if (videoPreviewRef.current) {
+            URL.revokeObjectURL(videoPreviewRef.current);
+            videoPreviewRef.current = null;
+        }
+        setVideoPreview(null);
+    };
 
     useEffect(() => {
         // reset form fields when switching post or opening dialog
         setData('content', post.content ?? '');
         setData('images', []);
         setData('remove_image', false);
+        setData('video', null);
+        setData('remove_video', false);
         setData('visibility', defaultVisibility);
         clearErrors();
 
         hiddenPreviewRef.current = new Set();
+        clearVideoPreview();
+
+        return () => clearVideoPreview();
 
         // NOTE: do not bump here (lint rule)
         // re-render will happen anyway when open/post.id changes
@@ -1399,11 +1509,39 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
         });
     };
 
+    const handleVideoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const [file] = event.target.files ?? [];
+        form.setData('video', file ?? null);
+
+        clearVideoPreview();
+
+        if (!file) return;
+
+        form.setData('remove_video', false);
+        const url = URL.createObjectURL(file);
+        videoPreviewRef.current = url;
+        setVideoPreview(url);
+    };
+
+    const handleClearVideoSelection = () => {
+        form.setData('video', null);
+        clearVideoPreview();
+    };
+
+    const handleRemoveExistingVideo = () => {
+        form.setData('remove_video', true);
+        form.setData('video', null);
+        clearVideoPreview();
+    };
+
     const isSharePost = Boolean(post.shared_post);
 
     const previewSources = isSharePost ? [] : post.image_urls ?? [];
 
     const visiblePreviewUrls = previewSources.filter((url) => !hiddenPreviewRef.current.has(url));
+    const existingVideoUrl = post.video_url ?? null;
+    const showExistingVideo = Boolean(existingVideoUrl) && !form.data.remove_video && !videoPreview;
+    const activeVideoUrl = videoPreview ?? (showExistingVideo ? existingVideoUrl : null);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1462,6 +1600,66 @@ function EditPostDialog({ post, open, onOpenChange }: EditPostDialogProps) {
                                     />
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {!isSharePost && (
+                        <div className="space-y-3">
+                            {activeVideoUrl && (
+                                <div className="overflow-hidden rounded-xl border border-border">
+                                    <video
+                                        src={activeVideoUrl}
+                                        controls
+                                        playsInline
+                                        preload="metadata"
+                                        className="w-full"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <VideoIcon className="h-4 w-4" />
+                                    <span>{t('feed.attach_video')}</span>
+                                </div>
+                                <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-2 py-1.5 text-[11px] font-semibold text-secondary-foreground transition hover:opacity-90">
+                                    <span>{t('feed.browse')}</span>
+                                    <input
+                                        type="file"
+                                        name="video"
+                                        accept="video/mp4,video/webm,video/quicktime"
+                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                        onChange={handleVideoChange}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {videoPreview && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={handleClearVideoSelection}
+                                    >
+                                        {t('feed.clear_selection')}
+                                    </Button>
+                                )}
+                                {!videoPreview && existingVideoUrl && !form.data.remove_video && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={handleRemoveExistingVideo}
+                                    >
+                                        {t('feed.remove_video')}
+                                    </Button>
+                                )}
+                            </div>
+
+                            <InputError message={form.errors.video} />
                         </div>
                     )}
 
@@ -2095,6 +2293,7 @@ function SharedPostPreview({
         [post.image_urls, hiddenImages],
     );
     const imageGridClass = resolveImageGridClass(sanitizedImages.length);
+    const videoUrl = post.video_url ?? null;
     const timestamp = useMemo(() => formatRelativeTime(post.created_at), [post.created_at]);
 
     return (
@@ -2126,6 +2325,12 @@ function SharedPostPreview({
             {(post.content ?? '').split('\n').map((line, idx) => (
                 <p key={`shared-preview-${idx}`}>{renderLineWithLinks(line, idx)}</p>
             ))}
+
+            {videoUrl && (
+                <div className="overflow-hidden rounded-2xl border border-border">
+                    <AutoPlayVideo src={videoUrl} />
+                </div>
+            )}
 
             {sanitizedImages.length > 0 && (
                 <div className={`grid w-full gap-2 ${imageGridClass}`}>
@@ -2183,6 +2388,62 @@ function ActionButton({
             <Icon className="h-4 w-4" strokeWidth={1.75} fill={active ? 'currentColor' : 'none'} />
             <span>{label}</span>
         </button>
+    );
+}
+
+function AutoPlayVideo({ src, className }: { src: string; className?: string }) {
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) {
+            return;
+        }
+
+        if (typeof IntersectionObserver === 'undefined') {
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(() => {});
+            }
+            return;
+        }
+
+        const minVisibleRatio = 0.6;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting && entry.intersectionRatio >= minVisibleRatio) {
+                        const playPromise = video.play();
+                        if (playPromise && typeof playPromise.catch === 'function') {
+                            playPromise.catch(() => {});
+                        }
+                        return;
+                    }
+
+                    video.pause();
+                });
+            },
+            { threshold: [0, minVisibleRatio, 1] },
+        );
+
+        observer.observe(video);
+
+        return () => {
+            observer.disconnect();
+            video.pause();
+        };
+    }, [src]);
+
+    return (
+        <video
+            ref={videoRef}
+            src={src}
+            muted
+            controls
+            playsInline
+            preload="metadata"
+            className={cn('w-full', className)}
+        />
     );
 }
 

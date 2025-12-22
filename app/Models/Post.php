@@ -20,6 +20,7 @@ class Post extends Model
         'content',
         'visibility',
         'image_paths',
+        'video_path',
         'likes_count',
         'comments_count',
         'shares_count',
@@ -28,6 +29,7 @@ class Post extends Model
 
     protected $appends = [
         'image_urls',
+        'video_url',
     ];
 
     protected function casts(): array
@@ -108,6 +110,13 @@ class Post extends Model
             );
 
             return array_values(array_filter($urls));
+        });
+    }
+
+    protected function videoUrl(): Attribute
+    {
+        return Attribute::get(function () {
+            return $this->resolveImageUrl($this->video_path);
         });
     }
 

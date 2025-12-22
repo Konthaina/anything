@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Models\PostShare;
 use App\Models\User;
 use App\Notifications\PostSharedNotification;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -41,6 +42,51 @@ it('renders the feed page with image urls', function () {
         );
 });
 
+it('renders the feed page with video url', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $path = 'posts/videos/example.mp4';
+    Storage::disk('public')->put($path, 'video');
+
+    $post = Post::factory()->for($user)->create([
+        'image_paths' => [],
+        'video_path' => $path,
+        'visibility' => 'public',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('feed.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('posts.data', 1)
+            ->where('posts.data.0.id', $post->id)
+            ->where('posts.data.0.video_url', Storage::disk('public')->url($path))
+        );
+});
+
+it('stores uploaded videos when creating a post', function () {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+    $video = UploadedFile::fake()->create('clip.mp4', 1024, 'video/mp4');
+
+    $this->actingAs($user)
+        ->from(route('feed.index', absolute: false))
+        ->post(route('feed.store'), [
+            'content' => 'Video post',
+            'visibility' => 'public',
+            'video' => $video,
+        ])
+        ->assertRedirect(route('feed.index', absolute: false));
+
+    $post = Post::query()->firstOrFail();
+
+    expect($post->video_path)->not->toBeNull();
+    expect($post->video_path)->toContain('posts/videos');
+    Storage::disk('public')->assertExists($post->video_path);
+});
+
 it('includes verified status for shared post authors', function () {
     $author = User::factory()->create([
         'is_verified' => true,
@@ -51,6 +97,7 @@ it('includes verified status for shared post authors', function () {
     $original = Post::factory()->for($author)->create([
         'visibility' => 'public',
         'created_at' => now()->subMinute(),
+        'video_path' => 'posts/videos/original.mp4',
     ]);
     $shared = Post::factory()->for($sharer)->create([
         'shared_post_id' => $original->id,
@@ -68,6 +115,7 @@ it('includes verified status for shared post authors', function () {
             ->where('posts.data.0.shared_post.id', $original->id)
             ->where('posts.data.0.shared_post.user.id', $author->id)
             ->where('posts.data.0.shared_post.user.is_verified', true)
+            ->where('posts.data.0.shared_post.video_url', Storage::disk('public')->url('posts/videos/original.mp4'))
         );
 });
 

@@ -7,6 +7,9 @@ use App\Events\PostDeleted;
 use App\Events\PostLikesUpdated;
 use App\Events\PostShared;
 use App\Events\PostUpdated;
+use App\Http\Requests\SharePostRequest;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 use App\Models\Post;
 use App\Models\PostLike;
 use App\Models\PostShare;
@@ -157,13 +160,11 @@ class FeedController extends Controller
         return back();
     }
 
-    public function share(Request $request, Post $post): RedirectResponse
+    public function share(SharePostRequest $request, Post $post): RedirectResponse
     {
         $user = $request->user();
 
-        $data = $request->validate([
-            'content' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $data = $request->validated();
 
         $shareContent = trim((string) ($data['content'] ?? ''));
 
@@ -187,6 +188,7 @@ class FeedController extends Controller
                 'content' => $shareContent,
                 'visibility' => $shareTarget->visibility ?? 'public',
                 'image_paths' => [],
+                'video_path' => null,
                 'likes_count' => 0,
                 'comments_count' => 0,
                 'shares_count' => 0,
@@ -223,21 +225,18 @@ class FeedController extends Controller
         return back();
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StorePostRequest $request): RedirectResponse
     {
-        $data = $request->validate([
-            'content' => ['required', 'string', 'max:2000'],
-            'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
-            'images.*' => ['image', 'max:5120'],
-            'visibility' => ['required', 'string', 'in:public,followers'],
-        ]);
+        $data = $request->validated();
 
         $imagePaths = $this->storeUploadedImages($this->gatherUploadedFiles($request->file('images')));
+        $videoPath = $this->storeUploadedVideo($request->file('video'));
 
         $post = $request->user()->posts()->create([
             'content' => $data['content'],
             'visibility' => $data['visibility'],
             'image_paths' => $imagePaths,
+            'video_path' => $videoPath,
             'likes_count' => 0,
             'comments_count' => 0,
             'shares_count' => 0,
@@ -248,35 +247,40 @@ class FeedController extends Controller
         return back();
     }
 
-    public function update(Request $request, Post $post): RedirectResponse
+    public function update(UpdatePostRequest $request, Post $post): RedirectResponse
     {
-        abort_unless($request->user()->id === $post->user_id, 403);
-
-        $data = $request->validate([
-            'content' => ['required', 'string', 'max:2000'],
-            'images' => ['nullable', 'array', 'max:'.self::MAX_IMAGES],
-            'images.*' => ['image', 'max:5120'],
-            'remove_image' => ['nullable', 'boolean'],
-            'visibility' => ['required', 'string', 'in:public,followers'],
-        ]);
+        $data = $request->validated();
 
         $imagePaths = $post->image_paths ?? [];
+        $videoPath = $post->video_path;
 
         if ($request->boolean('remove_image')) {
             $this->deleteStoredImages($imagePaths);
             $imagePaths = [];
         }
 
+        if ($request->boolean('remove_video')) {
+            $this->deleteStoredVideo($videoPath);
+            $videoPath = null;
+        }
+
         $uploadedFiles = $this->gatherUploadedFiles($request->file('images'));
+        $uploadedVideo = $request->file('video');
 
         if (! empty($uploadedFiles)) {
             $this->deleteStoredImages($imagePaths);
             $imagePaths = $this->storeUploadedImages($uploadedFiles);
         }
 
+        if ($uploadedVideo instanceof UploadedFile) {
+            $this->deleteStoredVideo($videoPath);
+            $videoPath = $this->storeUploadedVideo($uploadedVideo);
+        }
+
         $post->update([
             'content' => $data['content'],
             'image_paths' => $imagePaths,
+            'video_path' => $videoPath,
             'visibility' => $data['visibility'],
         ]);
 
@@ -292,6 +296,7 @@ class FeedController extends Controller
         abort_unless($request->user()->id === $post->user_id, 403);
 
         $this->deleteStoredImages($post->image_paths ?? []);
+        $this->deleteStoredVideo($post->video_path);
 
         $postId = $post->id;
 
@@ -325,6 +330,15 @@ class FeedController extends Controller
         );
     }
 
+    private function storeUploadedVideo(?UploadedFile $file): ?string
+    {
+        if (! $file) {
+            return null;
+        }
+
+        return $file->store('posts/videos', 'public');
+    }
+
     private function deleteStoredImages(array $paths): void
     {
         foreach ($paths as $path) {
@@ -333,6 +347,16 @@ class FeedController extends Controller
     }
 
     private function deleteStoredImage(?string $path): void
+    {
+        $this->deleteStoredPath($path);
+    }
+
+    private function deleteStoredVideo(?string $path): void
+    {
+        $this->deleteStoredPath($path);
+    }
+
+    private function deleteStoredPath(?string $path): void
     {
         if (! $path || Str::startsWith($path, ['http://', 'https://'])) {
             return;
