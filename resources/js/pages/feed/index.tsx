@@ -143,6 +143,95 @@ interface PostDeletedPayload {
     post_id?: number | string;
 }
 
+interface LikeResponse {
+    post_id: number | string;
+    liked: boolean;
+    likes_count: number;
+}
+
+interface ShareResponse {
+    post_id: number | string;
+    shares_count: number;
+    shared_post_id?: number | string | null;
+}
+
+interface CommentResponse {
+    post_id: number | string;
+    comments_count: number;
+    comment?: FeedComment;
+}
+
+interface JsonErrorPayload {
+    message?: string;
+    errors?: Record<string, string[]>;
+}
+
+function getXsrfToken(): string | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+function parseJsonPayload(text: string): unknown {
+    if (!text) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
+
+async function postJson<T>(url: string, body?: Record<string, unknown>): Promise<T> {
+    const xsrfToken = getXsrfToken();
+    const headers: HeadersInit = {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+
+    if (xsrfToken) {
+        headers['X-XSRF-TOKEN'] = xsrfToken;
+    }
+
+    const hasBody = body !== undefined;
+    if (hasBody) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers,
+        body: hasBody ? JSON.stringify(body) : undefined,
+    });
+
+    const payload = parseJsonPayload(await response.text());
+
+    if (!response.ok) {
+        throw { status: response.status, data: payload };
+    }
+
+    return payload as T;
+}
+
+function extractErrorMessage(payload: JsonErrorPayload | null | undefined, field: string): string | undefined {
+    if (!payload) {
+        return undefined;
+    }
+
+    const message = payload.errors?.[field]?.[0];
+    if (message) {
+        return message;
+    }
+
+    return typeof payload.message === 'string' ? payload.message : undefined;
+}
+
 function safeId() {
     return (
         (typeof crypto !== 'undefined' &&
@@ -984,17 +1073,17 @@ export function PostCard({
 
     const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
     const [optimisticLikesCount, setOptimisticLikesCount] = useState<number | null>(null);
+    const [liveLiked, setLiveLiked] = useState(Boolean(post.liked));
     const [liveLikesCount, setLiveLikesCount] = useState(post.likes_count ?? 0);
     const [liveCommentsCount, setLiveCommentsCount] = useState(post.comments_count ?? 0);
     const [liveComments, setLiveComments] = useState<FeedComment[]>(post.comments ?? []);
     const [liveSharesCount, setLiveSharesCount] = useState(post.shares_count ?? 0);
     const [hasShared, setHasShared] = useState(Boolean(post.shared));
     const [shareProcessing, setShareProcessing] = useState(false);
-    const shareForm = useForm<{ content: string }>({
-        content: '',
-    });
+    const [shareContent, setShareContent] = useState('');
+    const [shareError, setShareError] = useState<string | undefined>(undefined);
 
-    const liked = optimisticLiked ?? Boolean(post.liked);
+    const liked = optimisticLiked ?? liveLiked;
     const likesCount = optimisticLikesCount ?? liveLikesCount;
 
     const comments = liveComments;
@@ -1107,16 +1196,16 @@ export function PostCard({
         setShareDialogOpen(open);
 
         if (!open) {
-            shareForm.reset();
-            shareForm.clearErrors();
+            setShareContent('');
+            setShareError(undefined);
         }
     };
 
     const handleShareNoteChange = (value: string) => {
-        shareForm.setData('content', value);
+        setShareContent(value);
 
-        if (shareForm.errors.content) {
-            shareForm.clearErrors('content');
+        if (shareError) {
+            setShareError(undefined);
         }
     };
 
@@ -1138,29 +1227,22 @@ export function PostCard({
         setOptimisticLiked(nextLiked);
         setOptimisticLikesCount(nextCount);
 
-        router.post(
-            `/feed/${post.id}/like`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: (page) => {
-                    const updatedPosts = (page.props as { posts?: Paginated<FeedPost> } | undefined)
-                        ?.posts?.data;
-                    const updatedPost = updatedPosts?.find((item) => item.id === post.id);
-
-                    // if server gave updated props, drop optimism
-                    if (updatedPost) {
-                        setOptimisticLiked(null);
-                        setOptimisticLikesCount(null);
-                    }
-                },
-                onError: () => {
-                    setOptimisticLiked(null);
-                    setOptimisticLikesCount(null);
-                },
-                onFinish: () => setLikeProcessing(false),
-            },
-        );
+        postJson<LikeResponse>(`/feed/${post.id}/like`)
+            .then((payload) => {
+                setLiveLiked(payload.liked ?? nextLiked);
+                setLiveLikesCount(
+                    typeof payload.likes_count === 'number' ? payload.likes_count : nextCount,
+                );
+                setOptimisticLiked(null);
+                setOptimisticLikesCount(null);
+            })
+            .catch(() => {
+                setLiveLiked(prevLiked);
+                setLiveLikesCount(prevCount);
+                setOptimisticLiked(null);
+                setOptimisticLikesCount(null);
+            })
+            .finally(() => setLikeProcessing(false));
     };
 
     const handleShareSubmit = () => {
@@ -1170,20 +1252,29 @@ export function PostCard({
 
         setShareProcessing(true);
         setLiveSharesCount(previousCount + 1);
+        setShareError(undefined);
 
-        shareForm.post(`/feed/${post.id}/share`, {
-            preserveScroll: true,
-            onSuccess: () => {
+        postJson<ShareResponse>(`/feed/${post.id}/share`, {
+            content: shareContent,
+        })
+            .then((payload) => {
                 setHasShared(true);
-                shareForm.reset();
-                shareForm.clearErrors();
+                setLiveSharesCount(
+                    typeof payload.shares_count === 'number'
+                        ? payload.shares_count
+                        : previousCount + 1,
+                );
+                setShareContent('');
                 setShareDialogOpen(false);
-            },
-            onError: () => {
+            })
+            .catch((error) => {
                 setLiveSharesCount(previousCount);
-            },
-            onFinish: () => setShareProcessing(false),
-        });
+                setShareError(
+                    extractErrorMessage(error?.data as JsonErrorPayload | undefined, 'content') ||
+                        t('common.error'),
+                );
+            })
+            .finally(() => setShareProcessing(false));
     };
 
     return (
@@ -1404,7 +1495,19 @@ export function PostCard({
             </CardFooter>
 
             {commentsOpen && (
-                <CommentSection postId={post.id} comments={comments} getInitials={getInitials} />
+                <CommentSection
+                    postId={post.id}
+                    comments={comments}
+                    getInitials={getInitials}
+                    onCommentCreated={(comment, count) => {
+                        if (typeof count === 'number') {
+                            setLiveCommentsCount(count);
+                        }
+                        if (comment) {
+                            mergeIncomingComment(comment);
+                        }
+                    }}
+                />
             )}
 
             <EditPostDialog
@@ -1417,11 +1520,11 @@ export function PostCard({
             <ShareDialog
                 open={shareDialogOpen}
                 onOpenChange={handleShareDialogChange}
-                value={shareForm.data.content}
+                value={shareContent}
                 onChange={handleShareNoteChange}
                 onSubmit={handleShareSubmit}
                 submitting={shareProcessing}
-                error={shareForm.errors.content}
+                error={shareError}
             />
 
             <ImageViewerDialog
@@ -1634,10 +1737,10 @@ interface CommentSectionProps {
     postId: number | string;
     comments: FeedComment[];
     getInitials: (value?: string | null) => string;
-    onSubmitted?: () => void;
+    onCommentCreated?: (comment?: FeedComment, count?: number) => void;
 }
 
-function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentSectionProps) {
+function CommentSection({ postId, comments, getInitials, onCommentCreated }: CommentSectionProps) {
     const { t } = useI18n();
 
     const sortedComments = useMemo(() => {
@@ -1656,7 +1759,7 @@ function CommentSection({ postId, comments, getInitials, onSubmitted }: CommentS
                 postId={postId}
                 placeholder={t('feed.comment_placeholder')}
                 submitLabel={t('feed.post_comment')}
-                onSubmitted={() => onSubmitted?.()}
+                onSubmitted={onCommentCreated}
             />
 
             <div className="mt-4 space-y-4">
@@ -1786,7 +1889,7 @@ interface CommentFormProps {
     parentId?: number | null;
     placeholder: string;
     submitLabel: string;
-    onSubmitted?: () => void;
+    onSubmitted?: (comment?: FeedComment, count?: number) => void;
     onCancel?: () => void;
     compact?: boolean;
 }
@@ -1801,44 +1904,60 @@ function CommentForm({
     compact = false,
 }: CommentFormProps) {
     const { t } = useI18n();
-
-    const form = useForm({
-        content: '',
-        parent_id: parentId ?? null,
-    });
+    const [content, setContent] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState<string | undefined>(undefined);
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        form.setData('parent_id', parentId ?? null);
+        if (processing) {
+            return;
+        }
 
-        form.post(`/feed/${postId}/comments`, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => {
-                form.reset('content');
-                form.clearErrors();
-                onSubmitted?.();
-            },
-        });
+        setProcessing(true);
+        setError(undefined);
+
+        postJson<CommentResponse>(`/feed/${postId}/comments`, {
+            content,
+            parent_id: parentId ?? null,
+        })
+            .then((payload) => {
+                setContent('');
+                onSubmitted?.(payload.comment, payload.comments_count);
+            })
+            .catch((requestError) => {
+                setError(
+                    extractErrorMessage(
+                        requestError?.data as JsonErrorPayload | undefined,
+                        'content',
+                    ) || t('common.error'),
+                );
+            })
+            .finally(() => setProcessing(false));
     };
 
-    const disabled = form.processing || !form.data.content.trim();
+    const disabled = processing || !content.trim();
 
     return (
         <form onSubmit={handleSubmit} className="space-y-2">
             <textarea
-                value={form.data.content}
-                onChange={(event) => form.setData('content', event.target.value)}
+                value={content}
+                onChange={(event) => {
+                    setContent(event.target.value);
+                    if (error) {
+                        setError(undefined);
+                    }
+                }}
                 placeholder={placeholder}
                 rows={compact ? 2 : 3}
                 className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
             />
-            <InputError message={form.errors.content} />
+            <InputError message={error} />
 
             <div className="flex items-center justify-end gap-2">
                 {onCancel && (
-                    <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={form.processing}>
+                    <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={processing}>
                         {t('common.cancel')}
                     </Button>
                 )}

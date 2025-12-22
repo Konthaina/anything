@@ -7,14 +7,16 @@ use App\Models\Comment;
 use App\Models\Post;
 use App\Notifications\CommentRepliedNotification;
 use App\Notifications\PostCommentedNotification;
+use App\Support\FeedCommentPresenter;
 use App\Support\NotificationDispatcher;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CommentController extends Controller
 {
-    public function store(Request $request, Post $post): RedirectResponse
+    public function store(Request $request, Post $post): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -72,6 +74,20 @@ class CommentController extends Controller
                     new CommentRepliedNotification($comment->parent, $comment, $user),
                 );
             }
+        }
+
+        if ($request->expectsJson()) {
+            if (! $comment) {
+                return response()->json([
+                    'message' => 'Unable to create the comment.',
+                ], 500);
+            }
+
+            return response()->json([
+                'post_id' => $post->id,
+                'comments_count' => $post->comments_count,
+                'comment' => FeedCommentPresenter::present($comment),
+            ]);
         }
 
         return back();

@@ -371,3 +371,62 @@ it('allows the same user to share the same post multiple times', function () {
     expect(PostShare::query()->where('post_id', $post->id)->where('user_id', $user->id)->count())->toBe(2);
     expect($post->refresh()->shares_count)->toBe(2);
 });
+
+it('returns json when liking a post', function () {
+    $author = User::factory()->create();
+    $user = User::factory()->create();
+    $post = Post::factory()->for($author)->create([
+        'likes_count' => 0,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('feed.like', $post))
+        ->assertOk()
+        ->assertJson([
+            'post_id' => $post->id,
+            'liked' => true,
+            'likes_count' => 1,
+        ]);
+
+    expect($post->refresh()->likes_count)->toBe(1);
+});
+
+it('returns json when sharing a post', function () {
+    $author = User::factory()->create();
+    $user = User::factory()->create();
+    $post = Post::factory()->for($author)->create([
+        'shares_count' => 0,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('feed.share', $post), [
+            'content' => 'Sharing from json',
+        ])
+        ->assertOk()
+        ->assertJson([
+            'post_id' => $post->id,
+            'shares_count' => 1,
+        ]);
+
+    expect($post->refresh()->shares_count)->toBe(1);
+});
+
+it('returns json when creating a comment', function () {
+    $user = User::factory()->create();
+    $post = Post::factory()->for($user)->create([
+        'comments_count' => 0,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->postJson(route('comments.store', $post), [
+            'content' => 'Nice post!',
+        ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('post_id', $post->id)
+        ->assertJsonPath('comments_count', 1)
+        ->assertJsonPath('comment.content', 'Nice post!');
+
+    expect($post->refresh()->comments_count)->toBe(1);
+});

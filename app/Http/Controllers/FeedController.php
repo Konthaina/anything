@@ -19,6 +19,7 @@ use App\Notifications\PostUnlikedNotification;
 use App\Support\FeedPostPresenter;
 use App\Support\NotificationDispatcher;
 use App\Support\NotificationPresenter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -126,7 +127,7 @@ class FeedController extends Controller
         ]);
     }
 
-    public function toggleLike(Request $request, Post $post): RedirectResponse
+    public function toggleLike(Request $request, Post $post): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -157,10 +158,18 @@ class FeedController extends Controller
 
         event(new PostLikesUpdated($post));
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'post_id' => $post->id,
+                'liked' => ! $wasLiked,
+                'likes_count' => $post->likes_count,
+            ]);
+        }
+
         return back();
     }
 
-    public function share(SharePostRequest $request, Post $post): RedirectResponse
+    public function share(SharePostRequest $request, Post $post): JsonResponse|RedirectResponse
     {
         $user = $request->user();
 
@@ -220,6 +229,16 @@ class FeedController extends Controller
         if ($shareTarget->user_id !== $user->id) {
             $shareTarget->loadMissing('user');
             NotificationDispatcher::send($shareTarget->user, new PostSharedNotification($shareTarget, $user));
+        }
+
+        if ($request->expectsJson()) {
+            $post->refresh();
+
+            return response()->json([
+                'post_id' => $post->id,
+                'shares_count' => $post->shares_count,
+                'shared_post_id' => $sharedPost->id,
+            ]);
         }
 
         return back();
