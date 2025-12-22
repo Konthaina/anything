@@ -302,8 +302,9 @@
     "feed": {
         "title": "Feed",
         "empty": "No posts yet. Be the first to share something!",
-        "create_title": "Create a post",
-        "placeholder": "Share an update with your team...",
+        "create_title": "Create post",
+        "placeholder": "What's on your mind?",
+        "drop_media": "Drop images or video here",
         "attach_image": "Attach an image",
         "attach_video": "Attach a video",
         "browse": "Browse",

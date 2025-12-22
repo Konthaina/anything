@@ -49,7 +49,7 @@ import {
     ZoomIn,
     ZoomOut,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 export interface FeedUser {
     id: number;
@@ -369,6 +369,7 @@ const ACCEPTED_VIDEO_TYPES = new Set([
     'video/webm',
     'video/quicktime',
 ]);
+const MIN_POST_TEXTAREA_HEIGHT = 56;
 
 export default function FeedPage() {
     const page = usePage<
@@ -800,15 +801,15 @@ export function CreatePostCard({
 }) {
     const { t } = useI18n();
     const [content, setContent] = useState<string>('');
+    const contentRef = useRef<HTMLTextAreaElement | null>(null);
     const [previews, setPreviews] = useState<string[]>([]);
     const previewUrlsRef = useRef<string[]>([]);
     const [videoPreview, setVideoPreview] = useState<string | null>(null);
     const videoPreviewRef = useRef<string | null>(null);
     const [visibility, setVisibility] = useState<VisibilityValue>('public');
-    const imageDragCounterRef = useRef(0);
-    const videoDragCounterRef = useRef(0);
-    const [isImageDragActive, setIsImageDragActive] = useState(false);
-    const [isVideoDragActive, setIsVideoDragActive] = useState(false);
+    const mediaInputId = useId();
+    const dropCounterRef = useRef(0);
+    const [isDropActive, setIsDropActive] = useState(false);
 
     const cleanupImagePreviews = useCallback(() => {
         previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -829,24 +830,27 @@ export function CreatePostCard({
         cleanupVideoPreview();
     }, [cleanupImagePreviews, cleanupVideoPreview]);
 
+    const resizeContent = useCallback(() => {
+        const element = contentRef.current;
+        if (!element) {
+            return;
+        }
+
+        element.style.height = 'auto';
+        const nextHeight = Math.max(element.scrollHeight, MIN_POST_TEXTAREA_HEIGHT);
+        element.style.height = `${nextHeight}px`;
+    }, []);
+
     useEffect(() => {
         return () => cleanupPreviews();
     }, [cleanupPreviews]);
 
-    return (
-        <Card className="border-border bg-card text-foreground shadow-xl">
-            <CardHeader className="flex flex-row items-center gap-3 pb-4">
-                <Avatar className="h-11 w-11">
-                    <AvatarImage src={currentUser.avatar ?? undefined} alt={currentUser.name} />
-                    <AvatarFallback className="bg-muted text-foreground">
-                        {getInitials(currentUser.name)}
-                    </AvatarFallback>
-                </Avatar>
-                <CardTitle className="text-base font-semibold leading-tight">
-                    {t('feed.create_title')}
-                </CardTitle>
-            </CardHeader>
+    useEffect(() => {
+        resizeContent();
+    }, [content, resizeContent]);
 
+    return (
+        <Card className="border-border bg-card text-foreground shadow-xl py-4">
             <Form
                 method="post"
                 action="/feed"
@@ -856,8 +860,9 @@ export function CreatePostCard({
                     setContent('');
                     setVisibility('public');
                 }}
+                className="flex flex-col gap-4"
             >
-                {({ setData, processing, errors, reset }) => {
+                {({ setData, processing, errors }) => {
                     const updateImageSelection = (files: File[]) => {
                         const filtered = files
                             .filter((file) => file.type.startsWith('image/'))
@@ -884,99 +889,103 @@ export function CreatePostCard({
                         setVideoPreview(url);
                     };
 
-                    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-                        const files = Array.from(event.target.files ?? []).slice(0, MAX_IMAGES);
-                        setData?.('images', files);
-
-                        cleanupImagePreviews();
-
+                    const handleMediaFiles = (files: File[]) => {
                         if (files.length === 0) return;
 
-                        const urls = files.map((file) => URL.createObjectURL(file));
-                        previewUrlsRef.current = urls;
-                        setPreviews(urls);
+                        const images = files
+                            .filter((file) => file.type.startsWith('image/'))
+                            .slice(0, MAX_IMAGES);
+
+                        if (images.length > 0) {
+                            updateImageSelection(images);
+                        }
+
+                        const video = files.find((file) => ACCEPTED_VIDEO_TYPES.has(file.type));
+                        if (video) {
+                            updateVideoSelection(video);
+                        }
                     };
 
-                    const handleVideoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-                        const [file] = event.target.files ?? [];
-                        setData?.('video', file ?? null);
-
-                        cleanupVideoPreview();
-
-                        if (!file) return;
-
-                        const url = URL.createObjectURL(file);
-                        videoPreviewRef.current = url;
-                        setVideoPreview(url);
+                    const handleMixedMediaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+                        const files = Array.from(event.target.files ?? []);
+                        handleMediaFiles(files);
+                        event.target.value = '';
                     };
 
-                    const handleImageDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+                    const handleDropDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
                         event.preventDefault();
                         event.stopPropagation();
                         event.dataTransfer.dropEffect = 'copy';
                     };
 
-                    const handleImageDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+                    const handleDropDragEnter = (event: React.DragEvent<HTMLLabelElement>) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        imageDragCounterRef.current += 1;
-                        setIsImageDragActive(true);
+                        dropCounterRef.current += 1;
+                        setIsDropActive(true);
                     };
 
-                    const handleImageDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+                    const handleDropDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        imageDragCounterRef.current = Math.max(0, imageDragCounterRef.current - 1);
-                        if (imageDragCounterRef.current === 0) {
-                            setIsImageDragActive(false);
+                        dropCounterRef.current = Math.max(0, dropCounterRef.current - 1);
+                        if (dropCounterRef.current === 0) {
+                            setIsDropActive(false);
                         }
                     };
 
-                    const handleImageDrop = (event: React.DragEvent<HTMLDivElement>) => {
+                    const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        imageDragCounterRef.current = 0;
-                        setIsImageDragActive(false);
+                        dropCounterRef.current = 0;
+                        setIsDropActive(false);
 
                         const files = Array.from(event.dataTransfer.files ?? []);
-                        updateImageSelection(files);
-                    };
-
-                    const handleVideoDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.dataTransfer.dropEffect = 'copy';
-                    };
-
-                    const handleVideoDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        videoDragCounterRef.current += 1;
-                        setIsVideoDragActive(true);
-                    };
-
-                    const handleVideoDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        videoDragCounterRef.current = Math.max(0, videoDragCounterRef.current - 1);
-                        if (videoDragCounterRef.current === 0) {
-                            setIsVideoDragActive(false);
-                        }
-                    };
-
-                    const handleVideoDrop = (event: React.DragEvent<HTMLDivElement>) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        videoDragCounterRef.current = 0;
-                        setIsVideoDragActive(false);
-
-                        const [file] = Array.from(event.dataTransfer.files ?? []);
-                        updateVideoSelection(file);
+                        handleMediaFiles(files);
                     };
 
                     return (
                         <>
-                            <CardContent className="space-y-4">
+                            <CardHeader className="flex flex-row items-center justify-between border-b border-border/60 pb-3">
+                                <CardTitle className="text-base font-semibold leading-tight">
+                                    {t('feed.create_title')}
+                                </CardTitle>
+                            </CardHeader>
+
+                            <CardContent className="space-y-4 pt-0">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-11 w-11">
+                                        <AvatarImage
+                                            src={currentUser.avatar ?? undefined}
+                                            alt={currentUser.name}
+                                        />
+                                        <AvatarFallback className="bg-muted text-foreground">
+                                            {getInitials(currentUser.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-sm font-semibold text-foreground">
+                                            {currentUser.name}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <label htmlFor="post-visibility" className="sr-only">
+                                                {t('feed.visibility.label')}
+                                            </label>
+                                            <VisibilityDropdown
+                                                id="post-visibility"
+                                                name="visibility"
+                                                value={visibility}
+                                                onChange={(value) => {
+                                                    setVisibility(value);
+                                                    setData?.('visibility', value);
+                                                }}
+                                                className="h-6 px-2 text-[10px]"
+                                            />
+                                        </div>
+                                        <InputError message={errors.visibility} />
+                                    </div>
+                                </div>
+
                                 <textarea
                                     name="content"
                                     value={content}
@@ -985,77 +994,69 @@ export function CreatePostCard({
                                         setContent(next);
                                         setData?.('content', next);
                                     }}
+                                    ref={contentRef}
                                     placeholder={t('feed.placeholder')}
-                                    className="min-h-[140px] w-full resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60"
+                                    rows={1}
+                                    className="w-full resize-none overflow-hidden border-0 bg-transparent px-0 py-2 text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
                                 />
                                 <InputError message={errors.content} />
 
-                                <div
+                                <label
+                                    htmlFor={mediaInputId}
                                     className={cn(
-                                        'flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 transition',
-                                        isImageDragActive && 'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
+                                        'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center transition',
+                                        isDropActive &&
+                                            'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
                                     )}
-                                    onDragOver={handleImageDragOver}
-                                    onDragEnter={handleImageDragEnter}
-                                    onDragLeave={handleImageDragLeave}
-                                    onDrop={handleImageDrop}
+                                    onDragOver={handleDropDragOver}
+                                    onDragEnter={handleDropDragEnter}
+                                    onDragLeave={handleDropDragLeave}
+                                    onDrop={handleDrop}
                                 >
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <ImageIcon className="h-4 w-4" />
-                                        <span>{t('feed.attach_image')}</span>
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                                            <ImageIcon className="h-4 w-4" />
+                                        </span>
+                                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/10 text-blue-600">
+                                            <VideoIcon className="h-4 w-4" />
+                                        </span>
                                     </div>
-                                    <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
-                                        <span>{t('feed.browse')}</span>
-                                        <input
-                                            type="file"
-                                            name="images[]"
-                                            accept="image/*"
-                                            multiple
-                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                            onChange={handleFileChange}
-                                        />
-                                    </label>
-                                </div>
+                                    <span className="text-sm font-semibold text-foreground">
+                                        {t('feed.drop_media')}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="pointer-events-none"
+                                    >
+                                        {t('feed.browse')}
+                                    </Button>
+                                    <input
+                                        id={mediaInputId}
+                                        type="file"
+                                        multiple
+                                        accept="image/*,video/mp4,video/webm,video/quicktime"
+                                        className="sr-only"
+                                        onChange={handleMixedMediaChange}
+                                    />
+                                </label>
 
                                 <InputError message={errors.images} />
+                                <InputError message={errors.video} />
 
                                 {previews.length > 0 && (
                                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                         {previews.map((src) => (
-                                            <div key={src} className="overflow-hidden rounded-xl border border-border">
+                                            <div
+                                                key={src}
+                                                className="overflow-hidden rounded-xl border border-border"
+                                            >
                                                 <img src={src} alt="Preview" className="w-full object-cover" />
                                             </div>
                                         ))}
                                     </div>
                                 )}
-
-                                <div
-                                    className={cn(
-                                        'flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/40 px-4 py-3 transition',
-                                        isVideoDragActive && 'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
-                                    )}
-                                    onDragOver={handleVideoDragOver}
-                                    onDragEnter={handleVideoDragEnter}
-                                    onDragLeave={handleVideoDragLeave}
-                                    onDrop={handleVideoDrop}
-                                >
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <VideoIcon className="h-4 w-4" />
-                                        <span>{t('feed.attach_video')}</span>
-                                    </div>
-                                    <label className="relative inline-flex cursor-pointer items-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground transition hover:opacity-90">
-                                        <span>{t('feed.browse')}</span>
-                                        <input
-                                            type="file"
-                                            name="video"
-                                            accept="video/mp4,video/webm,video/quicktime"
-                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                            onChange={handleVideoChange}
-                                        />
-                                    </label>
-                                </div>
-
-                                <InputError message={errors.video} />
 
                                 {videoPreview && (
                                     <div className="space-y-2">
@@ -1084,49 +1085,10 @@ export function CreatePostCard({
                                 )}
                             </CardContent>
 
-                            <CardFooter className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <label htmlFor="post-visibility" className="font-semibold">
-                                            {t('feed.visibility.label')}
-                                        </label>
-                                        <VisibilityDropdown
-                                            id="post-visibility"
-                                            name="visibility"
-                                            value={visibility}
-                                            onChange={(value) => {
-                                                setVisibility(value);
-                                                setData?.('visibility', value);
-                                            }}
-                                        />
-                                    </div>
-                                    <InputError message={errors.visibility} />
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
-                                        onClick={() => {
-                                            reset?.();
-                                            cleanupPreviews();
-                                            setContent('');
-                                            setData?.('images', []);
-                                            setData?.('video', null);
-                                            setVisibility('public');
-                                            setData?.('visibility', 'public');
-                                        }}
-                                        disabled={processing}
-                                    >
-                                        {t('feed.clear')}
-                                    </Button>
-
-                                    <Button type="submit" size="sm" className="h-8 px-4 text-xs" disabled={processing}>
-                                        {t('feed.post')}
-                                    </Button>
-                                </div>
+                            <CardFooter className="pt-0">
+                                <Button type="submit" className="w-full" disabled={processing}>
+                                    {t('feed.post')}
+                                </Button>
                             </CardFooter>
                         </>
                     );
