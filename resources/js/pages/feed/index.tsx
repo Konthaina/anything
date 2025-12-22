@@ -409,6 +409,7 @@ export default function FeedPage() {
         unreadNotificationCount,
     );
     const [showScrollTop, setShowScrollTop] = useState(false);
+    const [pendingPosts, setPendingPosts] = useState<FeedPost[]>([]);
 
     useEffect(() => {
         if (currentPostsPage <= 1) {
@@ -448,6 +449,91 @@ export default function FeedPage() {
     );
 
     const getInitials = useInitials();
+    const pendingPostsCount = pendingPosts.length;
+
+    const shouldDeferInsert = useCallback(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        return window.scrollY > 80;
+    }, []);
+
+    const insertPostAtTop = useCallback((normalized: FeedPost) => {
+        setLivePosts((current) => {
+            const existingIndex = current.findIndex((post) => idsAreEqual(post.id, normalized.id));
+            if (existingIndex !== -1) {
+                const existing = current[existingIndex];
+                const nextPost = {
+                    ...normalized,
+                    liked: existing.liked,
+                    shared: existing.shared,
+                    comments: existing.comments,
+                };
+
+                return current.map((post, index) => (index === existingIndex ? nextPost : post));
+            }
+
+            return [normalized, ...current];
+        });
+    }, []);
+
+    const enqueuePost = useCallback(
+        (normalized: FeedPost) => {
+            setPendingPosts((current) => {
+                const existsInPending = current.some((post) => idsAreEqual(post.id, normalized.id));
+                const existsInFeed = livePosts.some((post) => idsAreEqual(post.id, normalized.id));
+
+                if (existsInPending || existsInFeed) {
+                    return current;
+                }
+
+                return [normalized, ...current];
+            });
+        },
+        [livePosts],
+    );
+
+    const handleIncomingPost = useCallback(
+        (normalized: FeedPost) => {
+            if (shouldDeferInsert()) {
+                enqueuePost(normalized);
+                return;
+            }
+
+            insertPostAtTop(normalized);
+        },
+        [enqueuePost, insertPostAtTop, shouldDeferInsert],
+    );
+
+    const handleShareCreated = useCallback(
+        (sharedPost: FeedPost) => {
+            handleIncomingPost(normalizePost(sharedPost));
+        },
+        [handleIncomingPost],
+    );
+
+    const handleShowPendingPosts = useCallback(() => {
+        if (pendingPosts.length === 0) {
+            return;
+        }
+
+        const pendingSnapshot = pendingPosts;
+        setPendingPosts([]);
+
+        setLivePosts((current) => {
+            const existingIds = new Set(current.map((post) => String(post.id)));
+            const toInsert = pendingSnapshot.filter(
+                (post) => !existingIds.has(String(post.id)),
+            );
+
+            return [...toInsert, ...current];
+        });
+
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [pendingPosts]);
 
     useEffect(() => {
         const echo = getEchoInstance();
@@ -465,23 +551,7 @@ export default function FeedPage() {
                 return;
             }
 
-            setLivePosts((current) => {
-                const exists = current.some((post) => idsAreEqual(post.id, normalized.id));
-                if (exists) {
-                    return current.map((post) =>
-                        idsAreEqual(post.id, normalized.id)
-                            ? {
-                                ...normalized,
-                                liked: post.liked,
-                                shared: post.shared,
-                                comments: post.comments,
-                            }
-                            : post,
-                    );
-                }
-
-                return [normalized, ...current];
-            });
+            handleIncomingPost(normalized);
         };
 
         const handleUpdated = (payload: PostUpdatedPayload) => {
@@ -590,7 +660,7 @@ export default function FeedPage() {
             channel.stopListening('.PostShared');
             echo.leaveChannel(channelName);
         };
-    }, [authUserId, followingIds]);
+    }, [authUserId, followingIds, handleIncomingPost]);
 
     useEffect(() => {
         if (!authUserId) return;
@@ -661,29 +731,15 @@ export default function FeedPage() {
                 )}
 
                 <div className="space-y-4">
-                    {livePosts.map((post) => {
-                        const imageSignature = (post.image_urls ?? []).join('|');
-                        const videoSignature = post.video_url ?? '';
-                        const commentsSignature = (post.comments ?? [])
-                            .map((comment) => comment.id)
-                            .join('|');
-                        const postSignature = [
-                            post.id,
-                            post.likes_count ?? 0,
-                            post.comments_count ?? 0,
-                            post.shares_count ?? 0,
-                            commentsSignature,
-                        ].join('|');
-                        const mediaSignature = `${videoSignature}-${imageSignature}`;
-                        return (
-                            <PostCard
-                                key={`${postSignature}-${mediaSignature}`}
-                                post={post}
-                                getInitials={getInitials}
-                                authUserId={authUserId}
-                            />
-                        );
-                    })}
+                    {livePosts.map((post) => (
+                        <PostCard
+                            key={String(post.id)}
+                            post={post}
+                            getInitials={getInitials}
+                            authUserId={authUserId}
+                            onShareCreated={handleShareCreated}
+                        />
+                    ))}
 
                     {livePosts.length === 0 && (
                         <Card className="border-slate-800 bg-slate-900/80 text-slate-100">
@@ -712,6 +768,18 @@ export default function FeedPage() {
                         </WhenVisible>
                     )}
                 </div>
+
+                {pendingPostsCount > 0 && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full px-5 text-xs font-semibold shadow-lg"
+                        onClick={handleShowPendingPosts}
+                    >
+                        {t('feed.new_posts', { count: pendingPostsCount })}
+                    </Button>
+                )}
 
                 {auth?.user && (
                     <NotificationFloatingButton
@@ -1053,10 +1121,12 @@ export function PostCard({
     post,
     getInitials,
     authUserId,
+    onShareCreated,
 }: {
     post: FeedPost;
     getInitials: (value?: string | null) => string;
     authUserId?: number;
+    onShareCreated?: (post: FeedPost) => void;
 }) {
     const { t } = useI18n();
     const visibilityLabel = t(`feed.visibility.${post.visibility ?? 'public'}` as const);
@@ -1264,6 +1334,9 @@ export function PostCard({
                         ? payload.shares_count
                         : previousCount + 1,
                 );
+                if (payload.post) {
+                    onShareCreated?.(payload.post);
+                }
                 setShareContent('');
                 setShareDialogOpen(false);
             })
