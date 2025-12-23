@@ -1,4 +1,4 @@
-﻿{
+{
     "common": {
         "app_name": "Laravel Starter",
         "language": "ភាសា",
@@ -45,6 +45,7 @@
     "nav": {
         "dashboard": "ផ្ទាំងគ្រប់គ្រង",
         "feed": "ហ្វីដ",
+        "topusers": "អ្នកប្រើកំពូល",
         "repository": "ឃ្លាំងកូដ",
         "documentation": "ឯកសារ",
         "platform": "វេទិកា",
@@ -154,6 +155,11 @@
         "verified": "បានផ្ទៀងផ្ទាត់",
         "empty": "មិនទាន់មានប្រកាសទេ។",
         "joined": "បានចូលរួម {date}"
+    },
+    "top_users": {
+        "title": "អ្នកប្រើកំពូល",
+        "description": "អ្នកប្រើដែលមានអ្នកតាមច្រើនបំផុត 10 នាក់។",
+        "empty": "មិនមានអ្នកប្រើទេ។"
     },
     "password": {
         "breadcrumb": "ការកំណត់ពាក្យសម្ងាត់",

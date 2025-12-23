@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, Newspaper } from 'lucide-react';
+import { BookOpen, Folder, Goal, Newspaper } from 'lucide-react';
 import { useMemo } from 'react';
 import AppLogo from './app-logo';
 
@@ -32,6 +32,11 @@ export function AppSidebar() {
                 href: '/feed',
                 icon: Newspaper,
             },
+            {
+                title: t('nav.topusers'),
+                href: '/top-users',
+                icon: Goal,
+            }
         ],
         [t],
     );

@@ -45,6 +45,7 @@
     "nav": {
         "dashboard": "Dashboard",
         "feed": "Feed",
+        "topusers": "Top Users",
         "repository": "Repository",
         "documentation": "Documentation",
         "platform": "Platform",
@@ -154,6 +155,11 @@
         "unfollow_confirm": "Unfollow {name}",
         "empty": "No posts yet.",
         "joined": "Joined {date}"
+    },
+    "top_users": {
+        "title": "Top Users",
+        "description": "The 10 most followed users right now.",
+        "empty": "No users yet."
     },
     "password": {
         "breadcrumb": "Password settings",
